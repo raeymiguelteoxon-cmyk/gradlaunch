@@ -7,82 +7,86 @@ export const config = {
 };
 
 export default async function handler(req, res) {
-  // Only allow POST
+  // CORS preflight
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') return res.status(200).end();
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
     return res.status(500).json({ error: 'API key not configured on server.' });
   }
 
-  const { pdfBase64, filters } = req.body;
-  if (!pdfBase64) {
-    return res.status(400).json({ error: 'No resume data provided.' });
+  const { resumeText, filters } = req.body;
+  if (!resumeText || resumeText.trim().length < 50) {
+    return res.status(400).json({ error: 'Resume text too short or missing. Please upload a valid text-based PDF.' });
   }
 
-  const prompt = `You are a resume parser for a Philippine job matching platform for fresh graduates.
-Analyze the attached resume PDF and return ONLY a valid JSON object. No markdown, no explanation, no backticks.
+  const prompt = `You are an expert resume parser for a Philippine job matching platform for fresh graduates.
 
+Analyze the following resume and return ONLY a valid JSON object. No markdown, no explanation, no backticks.
+
+Resume:
+"""
+${resumeText.slice(0, 6000)}
+"""
+
+Return exactly this JSON:
 {
-  "name": "full name from resume",
+  "name": "full name",
   "degree": "college degree e.g. Computer Science",
   "school": "university or college name",
-  "topRole": "best entry-level job title for this person e.g. Junior Software Developer",
+  "topRole": "best entry-level job title e.g. Junior Software Developer",
   "skills": ["skill1", "skill2", "skill3", "skill4", "skill5"],
-  "summary": "2-sentence professional summary written for a fresh graduate",
+  "summary": "2-sentence professional summary in third person for a fresh graduate",
   "strengths": ["strength1", "strength2", "strength3"]
 }
 
-Location preference: ${filters?.location || 'Metro Manila'}
-Job type: ${filters?.type || 'Full-time'}
-Salary expectation: ${filters?.salary || 'Any'}
+Preferences: Location: ${filters?.location || 'Metro Manila'}, Type: ${filters?.type || 'Full-time'}, Salary: ${filters?.salary || 'Any'}
 
-Be accurate. If any field is unclear, make a reasonable inference based on the degree and content.`;
+Return ONLY the JSON. Nothing else.`;
 
   try {
-    const geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{
-            parts: [
-              { inline_data: { mime_type: 'application/pdf', data: pdfBase64 } },
-              { text: prompt }
-            ]
-          }]
-        }),
-      }
-    );
+    const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: 'llama-3.3-70b-versatile',
+        temperature: 0.3,
+        max_tokens: 800,
+        messages: [
+          { role: 'system', content: 'You are a precise resume parser. Always respond with valid JSON only. No markdown, no extra text.' },
+          { role: 'user', content: prompt },
+        ],
+      }),
+    });
 
-    if (!geminiRes.ok) {
-      const errData = await geminiRes.json();
-      return res.status(502).json({ error: errData?.error?.message || 'Gemini API error' });
+    if (!groqRes.ok) {
+      const errData = await groqRes.json();
+      return res.status(502).json({ error: errData?.error?.message || 'AI service error. Please try again.' });
     }
 
-    const geminiData = await geminiRes.json();
-    const rawText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
-
-    // Clean and parse JSON
+    const groqData = await groqRes.json();
+    const rawText = groqData.choices?.[0]?.message?.content || '';
     const clean = rawText.replace(/```json|```/g, '').trim();
     const jsonMatch = clean.match(/\{[\s\S]*\}/);
+
     if (!jsonMatch) {
-      return res.status(422).json({ error: 'Could not parse resume. Please try a clearer PDF.' });
+      return res.status(422).json({ error: 'Could not read resume. Make sure your PDF has selectable text (not a scanned image).' });
     }
 
     const profile = JSON.parse(jsonMatch[0]);
-
-    // Add CORS headers
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'POST');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
     return res.status(200).json({ profile });
 
   } catch (err) {
-    return res.status(500).json({ error: err.message || 'Unexpected server error.' });
+    return res.status(500).json({ error: err.message || 'Unexpected error. Please try again.' });
   }
 }

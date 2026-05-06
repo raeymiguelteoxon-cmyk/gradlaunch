@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 
 // ─── Global Styles ────────────────────────────────────────────────────────────
 const STYLES = `
@@ -9,132 +9,157 @@ const STYLES = `
   ::-webkit-scrollbar { width: 4px; }
   ::-webkit-scrollbar-track { background: #080b12; }
   ::-webkit-scrollbar-thumb { background: #2a3a5c; border-radius: 2px; }
-  input, select, textarea { font-family: 'Syne', sans-serif; }
   @keyframes fadeUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
   @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
   @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.4;} }
   @keyframes spin { to { transform: rotate(360deg); } }
-  @keyframes scanline { 0% { transform: translateY(-100%); } 100% { transform: translateY(500%); } }
-  @keyframes glow { 0%,100%{box-shadow:0 0 20px rgba(99,179,237,0.15)} 50%{box-shadow:0 0 50px rgba(99,179,237,0.4)} }
-  @keyframes shimmer { 0%,100%{opacity:0.5} 50%{opacity:1} }
+  @keyframes scanline { 0%{transform:translateY(-100%)} 100%{transform:translateY(500%)} }
+  @keyframes shimmer { 0%,100%{opacity:0.4} 50%{opacity:1} }
 `;
 
-// ─── Tokens ───────────────────────────────────────────────────────────────────
 const T = {
-  bg: "#080b12", surface: "#0e1420", surfaceHigh: "#141c2e",
-  border: "#1e2d47", borderHigh: "#2a3a5c",
-  text: "#e8eaf0", textMid: "#8a9bb8", textLow: "#3a4a68",
-  accent: "#63b3ed", accentGlow: "rgba(99,179,237,0.12)",
-  gold: "#f6c90e", goldPale: "rgba(246,201,14,0.1)",
-  green: "#48bb78", greenPale: "rgba(72,187,120,0.1)",
-  rose: "#fc8181", rosePale: "rgba(252,129,129,0.1)",
-  violet: "#b794f4",
+  bg:"#080b12", surface:"#0e1420", surfaceHigh:"#141c2e",
+  border:"#1e2d47", text:"#e8eaf0", textMid:"#8a9bb8", textLow:"#3a4a68",
+  accent:"#63b3ed", accentGlow:"rgba(99,179,237,0.12)",
+  gold:"#f6c90e", goldPale:"rgba(246,201,14,0.1)",
+  green:"#48bb78", greenPale:"rgba(72,187,120,0.1)",
+  rose:"#fc8181", violet:"#b794f4",
 };
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 const CAREER_PATHS = [
-  { degree:"Computer Science", icon:"💻", roles:["Junior Developer","Mid Developer","Senior Developer","Tech Lead","CTO"], salary:"₱25K–₱250K+", certs:["AWS Certified","Google Cloud","Meta Front-End"], industries:["FinTech","E-Commerce","Startups","BPO"], tip:"Build a GitHub portfolio with 3 real projects. AWS certification is highly valued even at entry level in PH." },
-  { degree:"Business Administration", icon:"📊", roles:["Marketing Assoc.","Brand Manager","Marketing Director","VP Marketing","CMO"], salary:"₱18K–₱180K+", certs:["Google Ads","HubSpot","PMP"], industries:["FMCG","Banking","Retail","Consulting"], tip:"Get Google Analytics certified for free. Build Excel and data skills early. LinkedIn is your most important networking tool." },
-  { degree:"Nursing", icon:"🏥", roles:["Staff Nurse","Head Nurse","Supervisor","Director of Nursing","CNO"], salary:"₱22K–₱200K+ (abroad)", certs:["PRC License","BLS/ACLS","NCLEX (USA)"], industries:["Hospitals","Clinics","OFW Nursing","Telehealth"], tip:"Pass PRC board first. Get 1–2 years local experience. Then pursue NCLEX to unlock US opportunities worth ₱200K+/month." },
-  { degree:"Accountancy", icon:"🧾", roles:["Junior Accountant","Senior Accountant","Finance Manager","Controller","CFO"], salary:"₱20K–₱200K+", certs:["CPA License","CMA","ACCA"], industries:["Big 4 Audit","Banking","Manufacturing","Government"], tip:"The CPA board exam is everything — it opens every major door in Philippine and international finance." },
-  { degree:"Education", icon:"📚", roles:["Teacher","Department Head","Principal","School Director","DepEd Official"], salary:"₱18K–₱80K+", certs:["LET License","TESOL","Special Ed Cert"], industries:["Public Schools","Private Schools","Online Tutoring","EdTech"], tip:"Pass LET first. Consider ESL online teaching (₱500–₱1,200/hr) on the side for extra income while building experience." },
-  { degree:"Psychology", icon:"🧠", roles:["HR Assistant","HR Generalist","HR Manager","HR Director","CHRO"], salary:"₱17K–₱160K+", certs:["RPm License","SHRM","Counseling License"], industries:["Corporate HR","NGOs","Mental Health","Research"], tip:"RPm license is your key credential. Build skills in BambooHR and Workday. Network actively at PMAP events." },
-  { degree:"Engineering", icon:"⚙️", roles:["Junior Engineer","Project Engineer","Senior Engineer","Engineering Manager","VP Engineering"], salary:"₱22K–₱220K+", certs:["PRC License","PMP","Six Sigma"], industries:["Construction","Manufacturing","Energy","Telco"], tip:"Pass your PRC board for your specialization. BIM and AutoCAD skills are in high demand — learn them early." },
-  { degree:"Architecture", icon:"🏛️", roles:["Junior Architect","Architect","Senior Architect","Principal Architect","Partner"], salary:"₱20K–₱180K+", certs:["PRC License","LEED","Revit/BIM"], industries:["Real Estate","Construction","Interior Design","Urban Planning"], tip:"Pass the Architecture board. Master Revit and BIM software — firms pay a premium for these skills in PH." },
+  { degree:"Computer Science",      icon:"💻", roles:["Junior Developer","Mid Developer","Senior Developer","Tech Lead","CTO"],                         salary:"₱25K–₱250K+",        certs:["AWS Certified","Google Cloud","Meta Front-End"],  industries:["FinTech","E-Commerce","Startups","BPO"],              tip:"Build a GitHub portfolio with 3 real projects. AWS certification is highly valued even at entry level in PH." },
+  { degree:"Business Administration",icon:"📊", roles:["Marketing Assoc.","Brand Manager","Marketing Director","VP Marketing","CMO"],                   salary:"₱18K–₱180K+",        certs:["Google Ads","HubSpot","PMP"],                     industries:["FMCG","Banking","Retail","Consulting"],               tip:"Get Google Analytics certified for free. Build Excel and data skills early. LinkedIn is your most important tool." },
+  { degree:"Nursing",                icon:"🏥", roles:["Staff Nurse","Head Nurse","Nurse Supervisor","Director of Nursing","CNO"],                       salary:"₱22K–₱200K+ (abroad)",certs:["PRC License","BLS/ACLS","NCLEX (USA)"],           industries:["Hospitals","Clinics","OFW Nursing","Telehealth"],     tip:"Pass PRC board first. Get 1–2 years local experience. Then pursue NCLEX to unlock US opportunities worth ₱200K+/month." },
+  { degree:"Accountancy",            icon:"🧾", roles:["Junior Accountant","Senior Accountant","Finance Manager","Controller","CFO"],                    salary:"₱20K–₱200K+",        certs:["CPA License","CMA","ACCA"],                       industries:["Big 4 Audit","Banking","Manufacturing","Government"],  tip:"The CPA board exam is everything — it opens every major door in Philippine and international finance." },
+  { degree:"Education",              icon:"📚", roles:["Teacher","Department Head","Principal","School Director","DepEd Official"],                      salary:"₱18K–₱80K+",         certs:["LET License","TESOL","Special Ed Cert"],          industries:["Public Schools","Private Schools","Online Tutoring","EdTech"], tip:"Pass LET first. Consider ESL online teaching (₱500–₱1,200/hr) on the side for extra income." },
+  { degree:"Psychology",             icon:"🧠", roles:["HR Assistant","HR Generalist","HR Manager","HR Director","CHRO"],                               salary:"₱17K–₱160K+",        certs:["RPm License","SHRM","Counseling License"],        industries:["Corporate HR","NGOs","Mental Health","Research"],      tip:"RPm license is your key credential. Build skills in BambooHR and Workday. Network at PMAP events." },
+  { degree:"Engineering",            icon:"⚙️", roles:["Junior Engineer","Project Engineer","Senior Engineer","Engineering Manager","VP Engineering"],   salary:"₱22K–₱220K+",        certs:["PRC License","PMP","Six Sigma"],                  industries:["Construction","Manufacturing","Energy","Telco"],       tip:"Pass your PRC board for your specialization. BIM and AutoCAD skills are in high demand — learn them early." },
+  { degree:"Architecture",           icon:"🏛️", roles:["Junior Architect","Architect","Senior Architect","Principal Architect","Partner"],              salary:"₱20K–₱180K+",        certs:["PRC License","LEED","Revit/BIM"],                 industries:["Real Estate","Construction","Interior Design","Urban Planning"], tip:"Pass the Architecture board. Master Revit and BIM — firms pay a premium for these skills in PH." },
 ];
 
 const GUIDE_STEPS = [
-  { n:"01", icon:"🔍", title:"Know Yourself First", body:"Before applying anywhere, identify your strengths, interests, and values. Use the Holland Code (RIASEC) test. Write down what energized you most in college — that's your compass.", tip:"Try typefind.com or 16personalities.com for a free career personality test." },
-  { n:"02", icon:"📄", title:"Polish Your Resume", body:"Keep it to 1 page. Lead with a 2-sentence summary. Use numbers: 'increased club membership by 40%' beats 'helped grow the club'. List thesis, org experience, internships, and skills.", tip:"Use Canva's free resume templates. Always export as PDF — ATS systems can't read fancy graphic formats." },
-  { n:"03", icon:"🌐", title:"Build Your LinkedIn", body:"Recruiters find YOU on LinkedIn. Use a professional photo, write a headline beyond 'Fresh Graduate', connect with classmates and professors, and set yourself to Open to Work.", tip:"A complete LinkedIn profile gets 40× more recruiter messages than an incomplete one." },
-  { n:"04", icon:"🎯", title:"Apply Strategically", body:"Don't spray 100 applications. Target 10–15 companies that genuinely excite you. Tailor your resume keywords to match each job description. Quality always beats quantity.", tip:"Use GradLaunch's AI matcher to instantly find your best-fit roles across PH job boards." },
-  { n:"05", icon:"🤝", title:"Nail the Interview", body:"Research the company thoroughly before going. Use STAR method (Situation, Task, Action, Result) for your answers. Arrive 10 minutes early. Bring extra resume copies and a notebook.", tip:"Practice your 90-second 'Tell me about yourself' answer until it flows naturally and confidently." },
-  { n:"06", icon:"🚀", title:"Start Strong on Day One", body:"Treat your first 90 days as a second interview. Be curious, be early, deliver on every promise. Build relationships across the team, not just with your direct manager.", tip:"Ask on Day 1: 'What does success look like in this role after 90 days?' This one question makes you unforgettable." },
+  { n:"01", icon:"🔍", title:"Know Yourself First",       body:"Before applying anywhere, identify your strengths, interests, and values. Use the Holland Code (RIASEC) test. Write down what energized you most in college — that's your compass.",                                                                 tip:"Try typefind.com or 16personalities.com for a free career personality test." },
+  { n:"02", icon:"📄", title:"Polish Your Resume",         body:"Keep it to 1 page. Lead with a 2-sentence summary. Use numbers: 'increased club membership by 40%' beats 'helped grow the club'. List thesis, org experience, internships, and skills.",                                                              tip:"Use Canva's free resume templates. Always export as PDF — ATS systems can't read fancy graphic formats." },
+  { n:"03", icon:"🌐", title:"Build Your LinkedIn",         body:"Recruiters find YOU on LinkedIn. Use a professional photo, write a headline beyond 'Fresh Graduate', connect with classmates and professors, and set yourself to Open to Work.",                                                                       tip:"A complete LinkedIn profile gets 40× more recruiter messages than an incomplete one." },
+  { n:"04", icon:"🎯", title:"Apply Strategically",         body:"Don't spray 100 applications. Target 10–15 companies that genuinely excite you. Tailor your resume keywords to match each job description. Quality always beats quantity.",                                                                           tip:"Use GradLaunch's AI matcher to instantly find your best-fit roles across PH job boards." },
+  { n:"05", icon:"🤝", title:"Nail the Interview",          body:"Research the company thoroughly. Use STAR method (Situation, Task, Action, Result) for your answers. Arrive 10 minutes early. Bring extra resume copies and a notebook.",                                                                              tip:"Practice your 90-second 'Tell me about yourself' answer until it flows naturally and confidently." },
+  { n:"06", icon:"🚀", title:"Start Strong on Day One",     body:"Treat your first 90 days as a second interview. Be curious, be early, deliver on every promise. Build relationships across the team, not just with your direct manager.",                                                                             tip:"Ask on Day 1: 'What does success look like in this role after 90 days?' This one question makes you unforgettable." },
 ];
 
 const PLATFORMS = {
-  "JobStreet":     { color:"#e53e3e", bg:"rgba(229,62,62,0.1)",    icon:"🔴" },
-  "OnlineJobs.ph": { color:"#48bb78", bg:"rgba(72,187,120,0.1)",   icon:"🟢" },
-  "LinkedIn":      { color:"#63b3ed", bg:"rgba(99,179,237,0.1)",   icon:"🔵" },
-  "Kalibrr":       { color:"#b794f4", bg:"rgba(183,148,244,0.1)",  icon:"🟣" },
-  "JobBank PH":    { color:"#f6c90e", bg:"rgba(246,201,14,0.1)",   icon:"🟡" },
+  "JobStreet":     { color:"#e53e3e", bg:"rgba(229,62,62,0.1)",   icon:"🔴" },
+  "OnlineJobs.ph": { color:"#48bb78", bg:"rgba(72,187,120,0.1)",  icon:"🟢" },
+  "LinkedIn":      { color:"#63b3ed", bg:"rgba(99,179,237,0.1)",  icon:"🔵" },
+  "Kalibrr":       { color:"#b794f4", bg:"rgba(183,148,244,0.1)", icon:"🟣" },
+  "JobBank PH":    { color:"#f6c90e", bg:"rgba(246,201,14,0.1)",  icon:"🟡" },
 };
 
-// ─── Build job search URLs from AI profile ────────────────────────────────────
+// ─── Build job search URLs ────────────────────────────────────────────────────
 function buildJobLinks(profile, filters) {
-  const role    = encodeURIComponent(profile.topRole || profile.degree || "fresh graduate");
-  const deg     = encodeURIComponent(profile.degree  || "fresh graduate");
-  const loc     = encodeURIComponent(filters.location === "Open to Anywhere" ? "" : filters.location);
-  const salMap  = { "Any":"", "₱15K–₱20K":"15000", "₱20K–₱30K":"20000", "₱30K–₱50K":"30000", "₱50K+":"50000" };
-  const sal     = salMap[filters.salary] || "";
-  const jtype   = filters.type === "Full-time" ? "F" : "P";
+  const role  = encodeURIComponent(profile.topRole || profile.degree || "fresh graduate");
+  const deg   = encodeURIComponent(profile.degree  || "fresh graduate");
+  const loc   = encodeURIComponent(filters.location === "Open to Anywhere" ? "" : filters.location);
+  const salMap = { "Any":"","₱15K–₱20K":"15000","₱20K–₱30K":"20000","₱30K–₱50K":"30000","₱50K+":"50000" };
+  const sal   = salMap[filters.salary] || "";
+  const jtype = filters.type === "Full-time" ? "F" : "P";
 
   return [
     {
-      platform: "JobStreet",
-      title: `${profile.topRole || profile.degree} — Fresh Graduate`,
-      url: `https://www.jobstreet.com.ph/en/job-search/${role.toLowerCase().replace(/%20/g,"-")}-jobs/?createdAt=7${sal ? `&salary=${sal}` : ""}`,
-      reason: `JobStreet PH is the #1 job board in the Philippines. This search is pre-filtered to your role (${profile.topRole || profile.degree}) and shows listings posted in the last 7 days — the freshest opportunities.`,
-      matchScore: 95,
-      tags: ["#1 PH Job Board", "Fresh Grad OK", filters.type],
+      platform:"JobStreet", title:`${profile.topRole || profile.degree} — Fresh Graduate`,
+      url:`https://www.jobstreet.com.ph/en/job-search/${role.toLowerCase().replace(/%20/g,"-")}-jobs/?createdAt=7${sal?`&salary=${sal}`:""}`,
+      reason:`JobStreet PH is the #1 job board in the Philippines. Pre-filtered to your role (${profile.topRole || profile.degree}) showing listings posted in the last 7 days — the freshest opportunities available.`,
+      matchScore:95, tags:["#1 PH Job Board","Fresh Grad OK",filters.type],
     },
     {
-      platform: "Kalibrr",
-      title: `Entry-Level ${profile.topRole || profile.degree}`,
-      url: `https://www.kalibrr.com/job-board/te/${encodeURIComponent((profile.topRole || profile.degree).toLowerCase())}?employment_type=${filters.type === "Full-time" ? "full_time" : "part_time"}`,
-      reason: `Kalibrr specializes in connecting fresh graduates with companies that have structured onboarding and mentorship programs. Your ${profile.degree} background matches their active entry-level listings.`,
-      matchScore: 91,
-      tags: ["Fresh Grad Specialist", "Structured Training", "Fast Recruiter Response"],
+      platform:"Kalibrr", title:`Entry-Level ${profile.topRole || profile.degree}`,
+      url:`https://www.kalibrr.com/job-board/te/${encodeURIComponent((profile.topRole||profile.degree).toLowerCase())}?employment_type=${filters.type==="Full-time"?"full_time":"part_time"}`,
+      reason:`Kalibrr specializes in connecting fresh graduates with companies that have structured onboarding and mentorship programs. Your ${profile.degree} background matches their active entry-level listings.`,
+      matchScore:91, tags:["Fresh Grad Specialist","Structured Training","Fast Recruiter Response"],
     },
     {
-      platform: "LinkedIn",
-      title: `${profile.topRole || profile.degree} — Philippines`,
-      url: `https://www.linkedin.com/jobs/search/?keywords=${role}&location=Philippines&f_E=1&f_JT=${jtype}`,
-      reason: `LinkedIn's Entry Level filter (f_E=1) surfaces only roles open to fresh graduates across the Philippines. Your skills (${profile.skills?.slice(0,3).join(", ")}) align with several active postings here.`,
-      matchScore: 88,
-      tags: ["Entry Level Filter", "Direct Recruiter Access", "Network Effect"],
+      platform:"LinkedIn", title:`${profile.topRole || profile.degree} — Philippines`,
+      url:`https://www.linkedin.com/jobs/search/?keywords=${role}&location=Philippines&f_E=1&f_JT=${jtype}`,
+      reason:`LinkedIn's Entry Level filter (f_E=1) shows only roles open to fresh graduates across the Philippines. Your skills (${profile.skills?.slice(0,3).join(", ")}) match several active postings here.`,
+      matchScore:88, tags:["Entry Level Filter","Direct Recruiter Access","Network Effect"],
     },
     {
-      platform: "OnlineJobs.ph",
-      title: `Remote ${profile.topRole || profile.degree} Role`,
-      url: `https://www.onlinejobs.ph/jobseekers/info/${deg}`,
-      reason: `OnlineJobs.ph connects Filipino fresh grads with both local and international remote employers. A great option if you prefer work-from-home — many roles here offer flexible arrangements.`,
-      matchScore: 84,
-      tags: ["Remote Friendly", "WFH Possible", "Int'l Employers"],
+      platform:"OnlineJobs.ph", title:`Remote ${profile.topRole || profile.degree} Role`,
+      url:`https://www.onlinejobs.ph/jobseekers/info/${deg}`,
+      reason:`OnlineJobs.ph connects Filipino fresh grads with both local and international remote employers. A great option if you prefer work-from-home — many roles offer flexible arrangements.`,
+      matchScore:84, tags:["Remote Friendly","WFH Possible","Int'l Employers"],
     },
     {
-      platform: "JobStreet",
-      title: `${profile.degree} Graduate — ${filters.location}`,
-      url: `https://www.jobstreet.com.ph/en/job-search/${deg.toLowerCase().replace(/%20/g,"-")}-graduate-jobs/?where=${loc}`,
-      reason: `A location-specific JobStreet search for ${profile.degree} graduates in ${filters.location}. This reduces commute time and surfaces the most relevant companies hiring in your preferred area.`,
-      matchScore: 82,
-      tags: [`📍 ${filters.location}`, "Degree-Matched", "Local Companies"],
+      platform:"JobStreet", title:`${profile.degree} Graduate — ${filters.location}`,
+      url:`https://www.jobstreet.com.ph/en/job-search/${deg.toLowerCase().replace(/%20/g,"-")}-graduate-jobs/?where=${loc}`,
+      reason:`A location-specific JobStreet search for ${profile.degree} graduates in ${filters.location}. Reduces commute time and surfaces the most relevant companies hiring in your preferred area.`,
+      matchScore:82, tags:[`📍 ${filters.location}`,"Degree-Matched","Local Companies"],
     },
     {
-      platform: "JobBank PH",
-      title: `Junior ${profile.topRole || profile.degree} Openings`,
-      url: `https://jobbank.ph/search?q=${role}&l=${loc}`,
-      reason: `JobBank PH aggregates listings from multiple Philippine job boards into one place. Their fresh graduate filter surfaces roles that explicitly welcome zero-experience applicants like yourself.`,
-      matchScore: 78,
-      tags: ["Multi-Board Aggregator", "Zero Experience OK", "Wide Coverage"],
+      platform:"JobBank PH", title:`Junior ${profile.topRole || profile.degree} Openings`,
+      url:`https://jobbank.ph/search?q=${role}&l=${loc}`,
+      reason:`JobBank PH aggregates listings from multiple Philippine job boards into one place. Their fresh graduate filter surfaces roles that explicitly welcome zero-experience applicants like yourself.`,
+      matchScore:78, tags:["Multi-Board Aggregator","Zero Experience OK","Wide Coverage"],
     },
   ];
 }
 
+// ─── PDF Text Extractor using PDF.js CDN ─────────────────────────────────────
+async function extractTextFromPDF(file) {
+  return new Promise((resolve, reject) => {
+    const script = document.getElementById("pdfjs-script");
+    const workerScript = document.getElementById("pdfjs-worker");
+
+    const run = async () => {
+      try {
+        const pdfjsLib = window["pdfjs-dist/build/pdf"];
+        pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        let fullText = "";
+
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page = await pdf.getPage(i);
+          const content = await page.getTextContent();
+          const pageText = content.items.map(item => item.str).join(" ");
+          fullText += pageText + "\n";
+        }
+
+        if (fullText.trim().length < 50) {
+          reject(new Error("Could not extract text from PDF. Make sure your PDF has selectable text — not a scanned image."));
+        } else {
+          resolve(fullText.trim());
+        }
+      } catch (e) {
+        reject(new Error("Failed to read PDF: " + e.message));
+      }
+    };
+
+    if (window["pdfjs-dist/build/pdf"]) {
+      run();
+    } else {
+      // Load PDF.js dynamically
+      const s = document.createElement("script");
+      s.id = "pdfjs-script";
+      s.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+      s.onload = () => run();
+      s.onerror = () => reject(new Error("Failed to load PDF reader library."));
+      document.head.appendChild(s);
+    }
+  });
+}
+
 // ─── Shared UI ────────────────────────────────────────────────────────────────
-const Tag = ({ children, color = T.accent, bg }) => (
-  <span style={{ background: bg || color+"18", color, border:`1px solid ${color}30`, borderRadius:20, padding:"3px 10px", fontSize:11, fontWeight:600, letterSpacing:0.3, whiteSpace:"nowrap" }}>{children}</span>
+const Tag = ({ children, color=T.accent, bg }) => (
+  <span style={{ background:bg||color+"18", color, border:`1px solid ${color}30`, borderRadius:20, padding:"3px 10px", fontSize:11, fontWeight:600, letterSpacing:0.3, whiteSpace:"nowrap" }}>{children}</span>
 );
 
 const Btn = ({ children, onClick, variant="primary", style={}, disabled }) => {
-  const v = {
-    primary: { background:T.accent,       color:T.bg },
-    ghost:   { background:"transparent",  color:T.textMid, border:`1px solid ${T.border}` },
-    gold:    { background:T.gold,          color:T.bg },
-  };
+  const v = { primary:{background:T.accent,color:T.bg}, ghost:{background:"transparent",color:T.textMid,border:`1px solid ${T.border}`} };
   return (
     <button onClick={onClick} disabled={disabled}
-      style={{ fontFamily:"'Syne',sans-serif", fontWeight:700, fontSize:13, cursor:disabled?"not-allowed":"pointer", border:"none", borderRadius:9, padding:"10px 22px", transition:"all 0.2s", opacity:disabled?0.45:1, letterSpacing:0.3, ...v[variant], ...style }}>
+      style={{ fontFamily:"'Syne',sans-serif", fontWeight:700, fontSize:13, cursor:disabled?"not-allowed":"pointer", border:"none", borderRadius:9, padding:"10px 22px", transition:"all 0.2s", opacity:disabled?0.45:1, ...v[variant], ...style }}>
       {children}
     </button>
   );
@@ -152,7 +177,7 @@ function NavBar({ page, setPage }) {
         <div style={{ display:"flex", gap:2, background:T.surface, borderRadius:10, padding:3, border:`1px solid ${T.border}` }}>
           {[["home","✦ Job Finder"],["paths","Career Paths"],["guide","Job Hunt Guide"]].map(([p,l]) => (
             <button key={p} onClick={() => setPage(p)}
-              style={{ background:page===p?T.surfaceHigh:"transparent", color:page===p?T.text:T.textMid, border:page===p?`1px solid ${T.border}`:"1px solid transparent", borderRadius:7, padding:"7px 16px", cursor:"pointer", fontSize:12, fontWeight:700, fontFamily:"'Syne',sans-serif", transition:"all 0.18s", letterSpacing:0.3 }}>
+              style={{ background:page===p?T.surfaceHigh:"transparent", color:page===p?T.text:T.textMid, border:page===p?`1px solid ${T.border}`:"1px solid transparent", borderRadius:7, padding:"7px 16px", cursor:"pointer", fontSize:12, fontWeight:700, fontFamily:"'Syne',sans-serif", transition:"all 0.18s" }}>
               {l}
             </button>
           ))}
@@ -167,7 +192,6 @@ function NavBar({ page, setPage }) {
 function Home() {
   const [stage,    setStage]    = useState("upload");
   const [file,     setFile]     = useState(null);
-  const [base64,   setBase64]   = useState(null);
   const [filters,  setFilters]  = useState({ location:"Metro Manila", type:"Full-time", salary:"Any" });
   const [results,  setResults]  = useState(null);
   const [loadMsg,  setLoadMsg]  = useState("Reading your resume…");
@@ -180,7 +204,7 @@ function Home() {
     "Reading your resume…",
     "Extracting your degree and skills…",
     "Building your candidate profile…",
-    "Identifying your strongest roles…",
+    "Identifying your top roles…",
     "Generating personalized job searches…",
     "Matching to Philippine job boards…",
     "Almost ready…",
@@ -189,25 +213,27 @@ function Home() {
   const handleFile = (f) => {
     if (!f) return;
     if (f.type !== "application/pdf") { setError("Please upload a PDF file."); return; }
-    if (f.size > 10 * 1024 * 1024)   { setError("File too large. Max 10MB.");   return; }
-    setError("");
-    setFile(f);
-    const reader = new FileReader();
-    reader.onload = e => setBase64(e.target.result.split(",")[1]);
-    reader.readAsDataURL(f);
+    if (f.size > 10 * 1024 * 1024)   { setError("File too large. Max 10MB."); return; }
+    setError(""); setFile(f);
   };
 
   const runSearch = async () => {
-    if (!base64) return;
+    if (!file) return;
     setStage("loading"); setError("");
     let mi = 0;
-    const mt = setInterval(() => { mi = Math.min(mi+1, LOAD_MSGS.length-1); setLoadMsg(LOAD_MSGS[mi]); }, 2200);
+    const mt = setInterval(() => { mi = Math.min(mi+1, LOAD_MSGS.length-1); setLoadMsg(LOAD_MSGS[mi]); }, 2000);
 
     try {
+      // Step 1: Extract text from PDF in browser
+      setLoadMsg("Reading your resume…");
+      const resumeText = await extractTextFromPDF(file);
+
+      // Step 2: Send text to our secure backend
+      setLoadMsg("Analyzing with AI…");
       const res = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pdfBase64: base64, filters }),
+        body: JSON.stringify({ resumeText, filters }),
       });
 
       const data = await res.json();
@@ -224,7 +250,7 @@ function Home() {
     }
   };
 
-  const reset = () => { setStage("upload"); setFile(null); setBase64(null); setResults(null); setOpenCard(null); setError(""); };
+  const reset = () => { setStage("upload"); setFile(null); setResults(null); setOpenCard(null); setError(""); };
 
   return (
     <div style={{ minHeight:"100vh", background:T.bg, paddingTop:60 }}>
@@ -232,22 +258,22 @@ function Home() {
       {/* ── UPLOAD ── */}
       {stage === "upload" && (
         <section style={{ minHeight:"100vh", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", padding:"80px 2rem", position:"relative", overflow:"hidden" }}>
-          <div style={{ position:"absolute", inset:0, backgroundImage:`linear-gradient(${T.border}50 1px,transparent 1px),linear-gradient(90deg,${T.border}50 1px,transparent 1px)`, backgroundSize:"48px 48px", pointerEvents:"none" }} />
-          <div style={{ position:"absolute", width:700, height:400, borderRadius:"50%", background:`radial-gradient(ellipse,${T.accentGlow} 0%,transparent 70%)`, top:"0", left:"50%", transform:"translateX(-50%)", pointerEvents:"none" }} />
+          <div style={{ position:"absolute", inset:0, backgroundImage:`linear-gradient(${T.border}55 1px,transparent 1px),linear-gradient(90deg,${T.border}55 1px,transparent 1px)`, backgroundSize:"48px 48px", pointerEvents:"none" }} />
+          <div style={{ position:"absolute", width:700, height:400, borderRadius:"50%", background:`radial-gradient(ellipse,${T.accentGlow} 0%,transparent 70%)`, top:0, left:"50%", transform:"translateX(-50%)", pointerEvents:"none" }} />
 
           <div style={{ position:"relative", maxWidth:720, textAlign:"center", animation:"fadeUp 0.6s ease" }}>
             <div style={{ display:"inline-flex", alignItems:"center", gap:8, background:T.accentGlow, border:`1px solid ${T.accent}33`, borderRadius:40, padding:"6px 20px", marginBottom:36 }}>
               <span style={{ width:6, height:6, borderRadius:"50%", background:T.green, display:"inline-block", animation:"pulse 2s infinite" }} />
-              <span style={{ color:T.accent, fontSize:11, fontWeight:700, letterSpacing:2 }}>FREE · AI-POWERED · PHILIPPINE JOB BOARDS</span>
+              <span style={{ color:T.accent, fontSize:11, fontWeight:700, letterSpacing:2 }}>FREE · AI-POWERED · NO SIGN-UP NEEDED</span>
             </div>
 
-            <h1 style={{ fontFamily:"'Instrument Serif',serif", fontSize:"clamp(2.8rem,7vw,5.2rem)", fontWeight:400, color:T.text, lineHeight:1.08, marginBottom:20, letterSpacing:"-1.5px" }}>
+            <h1 style={{ fontFamily:"'Instrument Serif',serif", fontSize:"clamp(2.8rem,7vw,5.2rem)", color:T.text, lineHeight:1.08, marginBottom:20, letterSpacing:"-1.5px" }}>
               Upload your resume.<br />
               <em style={{ color:T.accent }}>We find your job.</em>
             </h1>
 
             <p style={{ color:T.textMid, fontSize:"clamp(0.95rem,2vw,1.1rem)", lineHeight:1.8, maxWidth:520, margin:"0 auto 52px" }}>
-              Our AI reads your resume, understands your degree and skills, then generates personalized search links across JobStreet PH, OnlineJobs.ph, Kalibrr, and LinkedIn — with a match explanation for each.
+              Our AI reads your resume, understands your degree and skills, then generates personalized job search links across JobStreet PH, OnlineJobs.ph, Kalibrr, and LinkedIn — with a match explanation for each.
             </p>
 
             {/* Upload zone */}
@@ -259,7 +285,7 @@ function Home() {
               style={{ border:`2px dashed ${dragOver?T.accent:file?T.green:T.border}`, borderRadius:20, padding:"52px 32px", cursor:"pointer", background:dragOver?T.accentGlow:file?T.greenPale:T.surface, transition:"all 0.25s", marginBottom:16, position:"relative", overflow:"hidden" }}
             >
               {!file && <div style={{ position:"absolute", inset:0, background:`linear-gradient(transparent 0%,${T.accent}06 50%,transparent 100%)`, height:"40%", animation:"scanline 4s ease-in-out infinite", pointerEvents:"none" }} />}
-              <div style={{ fontSize:52, marginBottom:14 }}>{file?"📄":"⬆️"}</div>
+              <div style={{ fontSize:52, marginBottom:14 }}>{file ? "📄" : "⬆️"}</div>
               {file ? (
                 <>
                   <p style={{ color:T.green, fontWeight:700, fontSize:16, marginBottom:6 }}>✓ {file.name}</p>
@@ -274,7 +300,11 @@ function Home() {
               <input ref={fileRef} type="file" accept=".pdf" style={{ display:"none" }} onChange={e => handleFile(e.target.files[0])} />
             </div>
 
-            {error && <p style={{ color:T.rose, fontSize:13, marginBottom:16 }}>⚠ {error}</p>}
+            {error && (
+              <div style={{ background:T.rosePale||"rgba(252,129,129,0.1)", border:`1px solid ${T.rose}44`, borderRadius:10, padding:"12px 16px", marginBottom:16, color:T.rose, fontSize:13 }}>
+                ⚠ {error}
+              </div>
+            )}
 
             {file && (
               <Btn onClick={() => setStage("filters")} style={{ padding:"14px 44px", fontSize:15, borderRadius:12 }}>
@@ -283,7 +313,7 @@ function Home() {
             )}
 
             <div style={{ display:"flex", gap:40, justifyContent:"center", marginTop:56, flexWrap:"wrap" }}>
-              {[["🔒","Private","Resume never stored"],["⚡","~30 sec","Upload to results"],["🇵🇭","PH-Focused","Real local job boards"],["🆓","Free","No account needed"]].map(([ic,t,d]) => (
+              {[["🔒","Private","Resume never stored"],["⚡","~20 sec","Upload to results"],["🇵🇭","PH-Focused","Real local job boards"],["🆓","100% Free","No sign-up needed"]].map(([ic,t,d]) => (
                 <div key={t} style={{ textAlign:"center" }}>
                   <div style={{ fontSize:22, marginBottom:5 }}>{ic}</div>
                   <div style={{ color:T.text, fontWeight:700, fontSize:13 }}>{t}</div>
@@ -308,8 +338,8 @@ function Home() {
             <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:20, padding:36, display:"flex", flexDirection:"column", gap:28 }}>
               {[
                 { label:"📍 Preferred Location", key:"location", opts:["Metro Manila","Cebu","Davao","Laguna / Cavite","Remote / WFH","Open to Anywhere"], ac:T.accent },
-                { label:"💼 Employment Type",    key:"type",     opts:["Full-time","Part-time","Internship","Freelance","Remote"],                          ac:T.accent },
-                { label:"💰 Expected Salary",    key:"salary",   opts:["Any","₱15K–₱20K","₱20K–₱30K","₱30K–₱50K","₱50K+"],                               ac:T.gold   },
+                { label:"💼 Employment Type",    key:"type",     opts:["Full-time","Part-time","Internship","Freelance","Remote"],                         ac:T.accent },
+                { label:"💰 Expected Salary",    key:"salary",   opts:["Any","₱15K–₱20K","₱20K–₱30K","₱30K–₱50K","₱50K+"],                              ac:T.gold },
               ].map(({ label, key, opts, ac }) => (
                 <div key={key}>
                   <label style={{ display:"block", fontSize:11, fontWeight:700, color:T.textMid, letterSpacing:1.5, textTransform:"uppercase", marginBottom:12 }}>{label}</label>
@@ -327,7 +357,7 @@ function Home() {
               <div style={{ display:"flex", gap:12, marginTop:4 }}>
                 <Btn variant="ghost" onClick={() => setStage("upload")} style={{ flex:1, padding:13 }}>← Back</Btn>
                 <Btn onClick={runSearch} style={{ flex:2, padding:13, fontSize:14, borderRadius:10 }}>
-                  Analyze Resume & Find Jobs ✦
+                  Analyze & Find Jobs ✦
                 </Btn>
               </div>
             </div>
@@ -341,7 +371,7 @@ function Home() {
           <div style={{ textAlign:"center", maxWidth:480 }}>
             <div style={{ width:72, height:72, border:`3px solid ${T.border}`, borderTopColor:T.accent, borderRadius:"50%", animation:"spin 0.9s linear infinite", margin:"0 auto 32px" }} />
             <h2 style={{ fontFamily:"'Instrument Serif',serif", fontSize:26, color:T.text, marginBottom:12, fontStyle:"italic" }}>{loadMsg}</h2>
-            <p style={{ color:T.textMid, fontSize:13, marginBottom:40 }}>Powered by Google Gemini AI — takes about 20–30 seconds.</p>
+            <p style={{ color:T.textMid, fontSize:13, marginBottom:40 }}>Powered by Groq AI (Llama 3.3 70B) — takes about 15–20 seconds.</p>
             <div style={{ display:"flex", gap:10, justifyContent:"center", flexWrap:"wrap" }}>
               {Object.entries(PLATFORMS).map(([name, cfg]) => (
                 <div key={name} style={{ background:T.surface, border:`1px solid ${cfg.color}33`, borderRadius:8, padding:"6px 14px", fontSize:11, color:cfg.color, fontWeight:600, animation:"shimmer 2s infinite" }}>
@@ -372,7 +402,7 @@ function Home() {
             </div>
 
             {/* AI summary */}
-            <div style={{ background:T.accentGlow, border:`1px solid ${T.accent}33`, borderRadius:14, padding:"18px 22px", marginBottom:28, display:"flex", gap:14, alignItems:"flex-start" }}>
+            <div style={{ background:T.accentGlow, border:`1px solid ${T.accent}33`, borderRadius:14, padding:"18px 22px", marginBottom:28, display:"flex", gap:14 }}>
               <span style={{ fontSize:20, flexShrink:0 }}>✦</span>
               <div>
                 <p style={{ color:T.accent, fontSize:10, fontWeight:700, letterSpacing:1.5, textTransform:"uppercase", marginBottom:6 }}>AI Profile Summary</p>
@@ -388,7 +418,7 @@ function Home() {
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-end", marginBottom:22, flexWrap:"wrap", gap:12 }}>
               <div>
                 <h2 style={{ fontFamily:"'Instrument Serif',serif", fontSize:26, color:T.text, fontStyle:"italic", marginBottom:3 }}>Your Matched Job Searches</h2>
-                <p style={{ color:T.textMid, fontSize:13 }}>{results.jobs?.length} personalized search links · Expand a card to see why it matches · Click to open and apply</p>
+                <p style={{ color:T.textMid, fontSize:13 }}>{results.jobs?.length} personalized links · Expand a card to see why it matches · Click to open and apply</p>
               </div>
               <Btn variant="ghost" onClick={() => setStage("filters")} style={{ fontSize:12 }}>⚙ Adjust Filters</Btn>
             </div>
@@ -402,8 +432,7 @@ function Home() {
                 return (
                   <div key={i}
                     style={{ background:T.surface, border:`1.5px solid ${isOpen?T.accent:T.border}`, borderRadius:16, overflow:"hidden", transition:"all 0.25s", cursor:"pointer", animation:`fadeUp 0.4s ease ${i*0.06}s both` }}
-                    onClick={() => setOpenCard(isOpen ? null : i)}>
-                    {/* match bar */}
+                    onClick={() => setOpenCard(isOpen?null:i)}>
                     <div style={{ height:3, background:T.border }}>
                       <div style={{ height:"100%", width:`${job.matchScore}%`, background:`linear-gradient(90deg,${T.accent},${T.gold})`, transition:"width 1s ease" }} />
                     </div>
@@ -435,7 +464,7 @@ function Home() {
                             <p style={{ color:T.textMid, fontSize:13, lineHeight:1.7 }}>{job.reason}</p>
                           </div>
                           <a href={job.url} target="_blank" rel="noopener noreferrer" style={{ textDecoration:"none", display:"block" }} onClick={e => e.stopPropagation()}>
-                            <div style={{ background:plat.color, color:"#fff", borderRadius:10, padding:13, textAlign:"center", fontWeight:800, fontSize:14, fontFamily:"'Syne',sans-serif", transition:"opacity 0.18s" }}
+                            <div style={{ background:plat.color, color:"#fff", borderRadius:10, padding:13, textAlign:"center", fontWeight:800, fontSize:14, fontFamily:"'Syne',sans-serif" }}
                               onMouseEnter={e => e.currentTarget.style.opacity="0.85"}
                               onMouseLeave={e => e.currentTarget.style.opacity="1"}>
                               Search on {job.platform} →
@@ -449,17 +478,17 @@ function Home() {
               })}
             </div>
 
-            {/* All job boards */}
+            {/* All boards */}
             <div style={{ marginTop:40, background:T.surface, border:`1px solid ${T.border}`, borderRadius:16, padding:26 }}>
               <p style={{ color:T.textMid, fontSize:11, fontWeight:700, letterSpacing:1.5, textTransform:"uppercase", marginBottom:18 }}>Browse All Philippine Job Boards</p>
               <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
                 {[
-                  { n:"JobStreet PH",  url:"https://www.jobstreet.com.ph",                                                               c:"#e53e3e" },
-                  { n:"OnlineJobs.ph", url:"https://www.onlinejobs.ph",                                                                  c:"#48bb78" },
-                  { n:"Kalibrr",       url:"https://www.kalibrr.com/job-board",                                                          c:"#b794f4" },
-                  { n:"LinkedIn PH",   url:"https://www.linkedin.com/jobs/search/?location=Philippines&f_E=1",                           c:"#63b3ed" },
-                  { n:"JobBank PH",    url:"https://jobbank.ph",                                                                         c:"#f6c90e" },
-                  { n:"Glassdoor PH",  url:"https://www.glassdoor.com/Job/philippines-jobs-SRCH_IL.0,11_IN204.htm",                      c:"#48bb78" },
+                  { n:"JobStreet PH",  url:"https://www.jobstreet.com.ph",                                             c:"#e53e3e" },
+                  { n:"OnlineJobs.ph", url:"https://www.onlinejobs.ph",                                                c:"#48bb78" },
+                  { n:"Kalibrr",       url:"https://www.kalibrr.com/job-board",                                        c:"#b794f4" },
+                  { n:"LinkedIn PH",   url:"https://www.linkedin.com/jobs/search/?location=Philippines&f_E=1",         c:"#63b3ed" },
+                  { n:"JobBank PH",    url:"https://jobbank.ph",                                                       c:"#f6c90e" },
+                  { n:"Glassdoor PH",  url:"https://www.glassdoor.com/Job/philippines-jobs-SRCH_IL.0,11_IN204.htm",    c:"#48bb78" },
                 ].map(b => (
                   <a key={b.n} href={b.url} target="_blank" rel="noopener noreferrer" style={{ textDecoration:"none" }}>
                     <div style={{ background:T.surfaceHigh, border:`1.5px solid ${b.c}44`, borderRadius:9, padding:"9px 18px", color:b.c, fontSize:13, fontWeight:700, transition:"all 0.18s" }}
@@ -580,7 +609,7 @@ function Footer({ setPage }) {
       <div style={{ maxWidth:1100, margin:"0 auto", display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:20 }}>
         <div>
           <div style={{ fontFamily:"'Instrument Serif',serif", color:T.text, fontSize:18, marginBottom:3 }}>GradLaunch</div>
-          <p style={{ color:T.textLow, fontSize:12 }}>Free AI job matching for Filipino fresh graduates. Powered by Google Gemini.</p>
+          <p style={{ color:T.textLow, fontSize:12 }}>Free AI job matching for Filipino fresh graduates. Powered by Groq + Llama 3.3.</p>
         </div>
         <div style={{ display:"flex", gap:20 }}>
           {[["home","Job Finder"],["paths","Career Paths"],["guide","Guide"]].map(([p,l]) => (
@@ -601,9 +630,9 @@ export default function App() {
     <div>
       <style>{STYLES}</style>
       <NavBar page={page} setPage={goTo} />
-      {page === "home"  && <><Home /><Footer setPage={goTo} /></>}
-      {page === "paths" && <><CareerPaths /><Footer setPage={goTo} /></>}
-      {page === "guide" && <><Guide /><Footer setPage={goTo} /></>}
+      {page==="home"  && <><Home /><Footer setPage={goTo} /></>}
+      {page==="paths" && <><CareerPaths /><Footer setPage={goTo} /></>}
+      {page==="guide" && <><Guide /><Footer setPage={goTo} /></>}
     </div>
   );
 }
