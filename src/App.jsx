@@ -1,758 +1,502 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef, useCallback } from "react";
 
-// ─── Fonts & Global Styles ────────────────────────────────────────────────────
-const GLOBAL_CSS = `
-  @import url('https://fonts.googleapis.com/css2?family=Fraunces:wght@400;700;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+// ─── Global Styles ────────────────────────────────────────────────────────────
+const STYLES = `
+  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Instrument+Serif:ital@0;1&family=DM+Mono:wght@400;500&display=swap');
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: #f7f5f0; font-family: 'Plus Jakarta Sans', sans-serif; }
-  ::-webkit-scrollbar { width: 5px; }
-  ::-webkit-scrollbar-track { background: #f0ede6; }
-  ::-webkit-scrollbar-thumb { background: #c8bfad; border-radius: 3px; }
-  input, textarea, select { font-family: 'Plus Jakarta Sans', sans-serif; }
-  input::placeholder, textarea::placeholder { color: #b5a992; }
-  @keyframes fadeUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
-  @keyframes shimmer { 0%,100% { opacity:.6; } 50% { opacity:1; } }
+  html { scroll-behavior: smooth; }
+  body { background: #080b12; font-family: 'Syne', sans-serif; color: #e8eaf0; overflow-x: hidden; }
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: #080b12; }
+  ::-webkit-scrollbar-thumb { background: #2a3a5c; border-radius: 2px; }
+  input, select, textarea { font-family: 'Syne', sans-serif; }
+  @keyframes fadeUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
+  @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
+  @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.4;} }
   @keyframes spin { to { transform: rotate(360deg); } }
-  @keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.05)} }
+  @keyframes scanline { 0% { transform: translateY(-100%); } 100% { transform: translateY(400%); } }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+  @keyframes gradShift { 0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%} }
+  @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
+  @keyframes glow { 0%,100%{box-shadow:0 0 20px rgba(99,179,237,0.2)} 50%{box-shadow:0 0 40px rgba(99,179,237,0.5)} }
 `;
 
-// ─── Color Palette ────────────────────────────────────────────────────────────
-const C = {
-  cream: "#f7f5f0",
-  parchment: "#ede9e0",
-  stone: "#c8bfad",
-  muted: "#9a8f7e",
-  ink: "#1a1714",
-  inkLight: "#3d3530",
-  forest: "#1a3a2a",
-  forestLight: "#2a5a40",
-  moss: "#4a7c59",
-  sage: "#8fb89a",
-  sagePale: "#d4e8da",
-  amber: "#c97d2e",
-  amberPale: "#f5e6ce",
-  rose: "#c45c52",
-  rosePale: "#f5d9d6",
-  sky: "#3a6ea8",
-  skyPale: "#d6e4f5",
+// ─── Design Tokens ────────────────────────────────────────────────────────────
+const T = {
+  bg: "#080b12",
+  surface: "#0e1420",
+  surfaceHigh: "#141c2e",
+  border: "#1e2d47",
+  borderHigh: "#2a3a5c",
+  text: "#e8eaf0",
+  textMid: "#8a9bb8",
+  textLow: "#4a5a78",
+  accent: "#63b3ed",
+  accentGlow: "rgba(99,179,237,0.15)",
+  accentDark: "#1a3a5c",
+  gold: "#f6c90e",
+  goldPale: "rgba(246,201,14,0.12)",
+  green: "#48bb78",
+  greenPale: "rgba(72,187,120,0.12)",
+  red: "#fc8181",
+  redPale: "rgba(252,129,129,0.12)",
 };
 
-// ─── Seed Data ────────────────────────────────────────────────────────────────
-const SEED_JOBS = [
-  { id: 1, title: "Junior Software Developer", company: "Synapse Technologies", companyId: "c1", location: "Makati, Metro Manila", type: "Full-time", degree: "Computer Science", salary: "₱25,000–₱35,000/mo", posted: "2 days ago", tags: ["React", "Node.js", "Entry Level"], description: "Build modern web applications as part of an agile team. No experience required — we train you from day one. Join a team of 40 engineers building the future of Filipino fintech.", logo: "ST", color: C.sky, applicants: 12 },
-  { id: 2, title: "Staff Nurse", company: "Healthbridge Medical Center", companyId: "c2", location: "Quezon City", type: "Full-time", degree: "Nursing", salary: "₱22,000–₱28,000/mo", posted: "1 day ago", tags: ["PRC Licensed", "ICU", "Fresh Grads OK"], description: "Provide quality patient care in our state-of-the-art facilities. Fresh board passers are highly encouraged to apply. Competitive HMO benefits on Day 1.", logo: "HM", color: C.moss, applicants: 8 },
-  { id: 3, title: "Junior Accountant", company: "Navarro & Partners CPAs", companyId: "c3", location: "BGC, Taguig", type: "Full-time", degree: "Accountancy", salary: "₱20,000–₱26,000/mo", posted: "3 days ago", tags: ["CPA Eligible", "Audit", "Tax"], description: "Assist senior accountants in audits, financial reports, and tax compliance. Great mentorship program and clear promotion track within 12 months.", logo: "NP", color: C.amber, applicants: 5 },
-  { id: 4, title: "Marketing Associate", company: "Lumiere Creative Agency", companyId: "c4", location: "Ortigas, Pasig", type: "Full-time", degree: "Business Administration", salary: "₱18,000–₱24,000/mo", posted: "Today", tags: ["Social Media", "Content", "Creative"], description: "Craft campaigns that move people. Join a young, energetic team working with top local and international brands across FMCG, tech, and lifestyle.", logo: "LC", color: C.rose, applicants: 20 },
-  { id: 5, title: "Elementary School Teacher", company: "Horizon Academy", companyId: "c5", location: "San Juan, Metro Manila", type: "Full-time", degree: "Education", salary: "₱18,000–₱22,000/mo", posted: "5 days ago", tags: ["LET Passer", "English", "Math"], description: "Shape the next generation in a supportive school environment that values teacher growth and student success.", logo: "HA", color: C.forestLight, applicants: 7 },
-  { id: 6, title: "HR Assistant", company: "Pinnacle Corp", companyId: "c6", location: "Mandaluyong", type: "Full-time", degree: "Psychology", salary: "₱17,000–₱22,000/mo", posted: "1 day ago", tags: ["Recruitment", "Onboarding", "People"], description: "Support our People & Culture team in hiring, onboarding, and employee engagement programs.", logo: "PC", color: C.sky, applicants: 3 },
-];
-
-const DEGREES = ["Computer Science","Business Administration","Nursing","Engineering","Education","Psychology","Accountancy","Architecture","Communication","Tourism & Hospitality"];
-
+// ─── Career Paths Data ────────────────────────────────────────────────────────
 const CAREER_PATHS = [
-  { degree: "Computer Science", icon: "💻", color: C.sky, roles: ["Junior Developer","Mid-level Developer","Senior Developer","Tech Lead","CTO"], salary: "₱25K → ₱250K+", certs: ["AWS Certified","Google Associate Dev","Meta Front-End Cert"], industries: ["FinTech","E-Commerce","Startups","Government IT","BPO"], firstStep: "Build a GitHub portfolio with 3 projects, then apply to entry-level roles or coding bootcamps." },
-  { degree: "Business Administration", icon: "📊", color: C.amber, roles: ["Marketing Assoc.","Brand Manager","Marketing Director","VP Marketing","CMO"], salary: "₱18K → ₱180K+", certs: ["Google Ads","HubSpot Marketing","PMP"], industries: ["FMCG","Real Estate","Banking","Retail","Consulting"], firstStep: "Intern at a marketing or operations team, build Excel/data skills, get Google Analytics certified." },
-  { degree: "Nursing", icon: "🏥", color: C.moss, roles: ["Staff Nurse","Head Nurse","Nurse Supervisor","Director of Nursing","Chief Nursing Officer"], salary: "₱22K → ₱200K+ (abroad)", certs: ["PRC License","BLS/ACLS","NCLEX (USA)"], industries: ["Hospitals","Clinics","Occupational Health","OFW Nursing","Telehealth"], firstStep: "Pass PRC board, volunteer at a local hospital for 1–2 yrs experience, then consider NCLEX for abroad." },
-  { degree: "Accountancy", icon: "🧾", color: C.amber, roles: ["Junior Accountant","Senior Accountant","Finance Manager","Controller","CFO"], salary: "₱20K → ₱200K+", certs: ["CPA License","CMA","ACCA"], industries: ["Big 4 Audit","Banking","Manufacturing","Government","Consulting"], firstStep: "Pass the CPA board exam — it opens every major door in finance and business." },
-  { degree: "Education", icon: "📚", color: C.forestLight, roles: ["Teacher","Department Head","Principal","School Director","DepEd Official"], salary: "₱18K → ₱80K+", certs: ["LET License","Special Ed Cert","TESOL"], industries: ["Public Schools","Private Schools","Online Tutoring","Publishing","EdTech"], firstStep: "Pass the LET, apply to DepEd or private schools, consider ESL online teaching for extra income." },
-  { degree: "Psychology", icon: "🧠", color: C.rose, roles: ["HR Assistant","HR Generalist","HR Manager","HR Director","CHRO"], salary: "₱17K → ₱160K+", certs: ["RPm License","SHRM","Counseling License"], industries: ["Corporate HR","Mental Health","NGOs","Research","Academe"], firstStep: "Get your RPm license, build skills in HR tools (Workday, BambooHR), network at PMAP events." },
+  { degree: "Computer Science", icon: "💻", roles: ["Junior Developer","Mid Developer","Senior Developer","Tech Lead","CTO"], salary: "₱25K–₱250K+", certs: ["AWS Certified","Google Cloud","Meta Front-End"], industries: ["FinTech","E-Commerce","Startups","BPO"], tip: "Build a GitHub portfolio with 3 real projects. Contribute to open source. Get AWS certified early." },
+  { degree: "Business Administration", icon: "📊", roles: ["Marketing Assoc.","Brand Manager","Marketing Director","VP Marketing","CMO"], salary: "₱18K–₱180K+", certs: ["Google Ads","HubSpot","PMP"], industries: ["FMCG","Banking","Retail","Consulting"], tip: "Get Google Analytics certified for free. Build Excel and data skills. Network at industry events." },
+  { degree: "Nursing", icon: "🏥", roles: ["Staff Nurse","Head Nurse","Supervisor","Director","CNO"], salary: "₱22K–₱200K+ (abroad)", certs: ["PRC License","BLS/ACLS","NCLEX"], industries: ["Hospitals","Clinics","OFW Nursing","Telehealth"], tip: "Pass PRC first. Get 1–2 years local experience. Then pursue NCLEX for USA opportunities." },
+  { degree: "Accountancy", icon: "🧾", roles: ["Junior Accountant","Senior Accountant","Finance Manager","Controller","CFO"], salary: "₱20K–₱200K+", certs: ["CPA License","CMA","ACCA"], industries: ["Big 4 Audit","Banking","Manufacturing","Government"], tip: "The CPA board exam is everything. It opens every major door in finance." },
+  { degree: "Education", icon: "📚", roles: ["Teacher","Dept Head","Principal","School Director","DepEd Official"], salary: "₱18K–₱80K+", certs: ["LET License","TESOL","Special Ed"], industries: ["Public Schools","Private Schools","Online Tutoring","EdTech"], tip: "Pass LET, then consider ESL online teaching (₱500–₱1,200/hr) for extra income." },
+  { degree: "Psychology", icon: "🧠", roles: ["HR Assistant","HR Generalist","HR Manager","HR Director","CHRO"], salary: "₱17K–₱160K+", certs: ["RPm License","SHRM","Counseling"], industries: ["Corporate HR","NGOs","Mental Health","Research"], tip: "RPm license is your key. Build skills in BambooHR and Workday. Network at PMAP events." },
+  { degree: "Engineering", icon: "⚙️", roles: ["Junior Engineer","Project Engineer","Senior Engineer","Engineering Manager","VP Engineering"], salary: "₱22K–₱220K+", certs: ["PRC License","PMP","Six Sigma"], industries: ["Construction","Manufacturing","Energy","Telco"], tip: "Pass PRC board for your specialization. BIM skills are in high demand for civil engineers." },
+  { degree: "Architecture", icon: "🏛️", roles: ["Junior Architect","Architect","Senior Architect","Principal","Partner"], salary: "₱20K–₱180K+", certs:["PRC License","LEED","AutoCAD"], industries: ["Real Estate","Construction","Interior Design","Urban Planning"], tip: "Pass the Architecture board. Learn Revit and BIM — firms pay premium for these skills." },
 ];
 
 const TUTORIAL_STEPS = [
-  { step: "01", icon: "🔍", title: "Know Yourself First", content: "Before applying anywhere, identify your strengths, interests, and values. Use free tools like the Holland Code (RIASEC) test. Write down what energized you most during college — that's your compass.", tip: "Try typefind.com or 16personalities.com for a free career personality test." },
-  { step: "02", icon: "📄", title: "Polish Your Resume", content: "Keep it to 1 page. Lead with a 2-sentence summary. List your thesis, org experience, internships, and skills. Use numbers wherever possible — 'increased club membership by 40%' beats 'helped grow the club'.", tip: "Use Canva's free resume templates, but export as PDF. Avoid fancy graphics — ATS systems can't read them." },
-  { step: "03", icon: "🌐", title: "Build a LinkedIn Profile", content: "LinkedIn is where recruiters find you. Use a professional photo, write a headline beyond 'Fresh Graduate', and connect with classmates, professors, and professionals. Set your profile to Open to Work.", tip: "A complete LinkedIn profile gets 40× more recruiter messages." },
-  { step: "04", icon: "🎯", title: "Apply Strategically", content: "Don't spam 100 companies. Target 10–15 that excite you. Tailor your resume for each role — match keywords in the job description. Quality beats quantity every single time.", tip: "Use GradLaunch to filter jobs by your degree and track your applications." },
-  { step: "05", icon: "🤝", title: "Nail the Interview", content: "Research the company. Prepare answers using STAR (Situation, Task, Action, Result). Arrive 10 minutes early. Bring extra copies of your resume and a notebook.", tip: "Most common question: 'Tell me about yourself.' Practice a confident 90-second answer." },
-  { step: "06", icon: "🚀", title: "Negotiate & Start Strong", content: "It's okay to negotiate politely. Research market rates for your role. Once hired, treat your first 90 days as a second interview — be curious, be early, deliver on every promise.", tip: "Ask your manager on Day 1: 'What does success look like after 90 days?' This makes you stand out." },
+  { n:"01", icon:"🔍", title:"Know Yourself", body:"Use the Holland Code (RIASEC) test to understand your career personality. Write down what energized you in college — that's your compass.", tip:"Try typefind.com or 16personalities.com free." },
+  { n:"02", icon:"📄", title:"Polish Your Resume", body:"Keep it 1 page. Lead with a 2-sentence summary. Use numbers: 'increased club membership by 40%' beats 'helped grow the club'. Export as PDF.", tip:"Canva has free resume templates. Avoid fancy graphics — ATS can't read them." },
+  { n:"03", icon:"🌐", title:"Build Your LinkedIn", body:"Recruiters find YOU on LinkedIn. Use a professional photo, write a headline beyond 'Fresh Graduate', and set yourself to Open to Work.", tip:"A complete LinkedIn profile gets 40× more recruiter views." },
+  { n:"04", icon:"🎯", title:"Apply Strategically", body:"Target 10–15 companies that excite you. Tailor your resume keywords to match each job description. Quality beats quantity.", tip:"Use GradLaunch's AI matcher to find the best-fit roles instantly." },
+  { n:"05", icon:"🤝", title:"Nail the Interview", body:"Research the company. Use STAR method (Situation, Task, Action, Result). Arrive 10 min early. Bring extra resume copies.", tip:"Practice your 90-second 'Tell me about yourself' answer until it's natural." },
+  { n:"06", icon:"🚀", title:"Start Strong", body:"Your first 90 days are a second interview. Be curious, be early, deliver on every promise. Ask: 'What does success look like in 90 days?'", tip:"This single question makes you stand out from every other new hire." },
 ];
 
-// ─── Shared UI Primitives ─────────────────────────────────────────────────────
-const Btn = ({ children, variant = "primary", onClick, style = {}, disabled }) => {
-  const base = { fontFamily: "inherit", fontWeight: 700, fontSize: 14, cursor: disabled ? "not-allowed" : "pointer", border: "none", borderRadius: 10, padding: "10px 22px", transition: "all 0.18s", opacity: disabled ? 0.5 : 1, ...style };
-  const variants = {
-    primary: { background: C.forest, color: C.cream },
-    ghost: { background: "transparent", color: C.inkLight, border: `1.5px solid ${C.stone}` },
-    accent: { background: C.amber, color: "#fff" },
-    danger: { background: C.rose, color: "#fff" },
-    sage: { background: C.sagePale, color: C.forest, border: `1px solid ${C.sage}` },
+// ─── Shared Components ────────────────────────────────────────────────────────
+const Btn = ({ children, onClick, variant = "primary", style = {}, disabled }) => {
+  const base = { fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 13, cursor: disabled ? "not-allowed" : "pointer", border: "none", borderRadius: 8, padding: "10px 22px", transition: "all 0.2s", opacity: disabled ? 0.5 : 1, letterSpacing: 0.3 };
+  const v = {
+    primary: { background: T.accent, color: "#080b12" },
+    ghost: { background: "transparent", color: T.textMid, border: `1px solid ${T.border}` },
+    gold: { background: T.gold, color: "#080b12" },
+    outline: { background: "transparent", color: T.accent, border: `1px solid ${T.accent}` },
   };
-  return <button onClick={onClick} disabled={disabled} style={{ ...base, ...variants[variant] }}>{children}</button>;
+  return <button onClick={onClick} disabled={disabled} style={{ ...base, ...v[variant], ...style }}>{children}</button>;
 };
 
-const Badge = ({ children, color = C.forest, bg = C.sagePale }) => (
-  <span style={{ background: bg, color, borderRadius: 20, padding: "3px 12px", fontSize: 11, fontWeight: 700, letterSpacing: 0.3 }}>{children}</span>
+const Tag = ({ children, color = T.accent, bg }) => (
+  <span style={{ background: bg || color + "18", color, border: `1px solid ${color}33`, borderRadius: 20, padding: "3px 10px", fontSize: 11, fontWeight: 600, letterSpacing: 0.3 }}>{children}</span>
 );
 
-const Input = ({ label, value, onChange, placeholder, type = "text", required }) => (
-  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-    {label && <label style={{ fontSize: 12, fontWeight: 700, color: C.inkLight, letterSpacing: 0.5, textTransform: "uppercase" }}>{label}{required && <span style={{ color: C.rose }}> *</span>}</label>}
-    <input type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
-      style={{ padding: "11px 14px", border: `1.5px solid ${C.stone}`, borderRadius: 10, fontSize: 14, background: "#fff", color: C.ink, outline: "none", transition: "border 0.2s" }}
-      onFocus={e => e.target.style.borderColor = C.forest}
-      onBlur={e => e.target.style.borderColor = C.stone}
-    />
-  </div>
-);
-
-const Textarea = ({ label, value, onChange, placeholder, rows = 4 }) => (
-  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-    {label && <label style={{ fontSize: 12, fontWeight: 700, color: C.inkLight, letterSpacing: 0.5, textTransform: "uppercase" }}>{label}</label>}
-    <textarea value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} rows={rows}
-      style={{ padding: "11px 14px", border: `1.5px solid ${C.stone}`, borderRadius: 10, fontSize: 14, background: "#fff", color: C.ink, outline: "none", resize: "vertical", transition: "border 0.2s" }}
-      onFocus={e => e.target.style.borderColor = C.forest}
-      onBlur={e => e.target.style.borderColor = C.stone}
-    />
-  </div>
-);
-
-const Select = ({ label, value, onChange, options }) => (
-  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-    {label && <label style={{ fontSize: 12, fontWeight: 700, color: C.inkLight, letterSpacing: 0.5, textTransform: "uppercase" }}>{label}</label>}
-    <select value={value} onChange={e => onChange(e.target.value)}
-      style={{ padding: "11px 14px", border: `1.5px solid ${C.stone}`, borderRadius: 10, fontSize: 14, background: "#fff", color: C.ink, outline: "none" }}>
-      {options.map(o => <option key={o.value || o} value={o.value || o}>{o.label || o}</option>)}
-    </select>
-  </div>
-);
-
-const Card = ({ children, style = {}, onClick }) => (
-  <div onClick={onClick} style={{ background: "#fff", border: `1.5px solid ${C.parchment}`, borderRadius: 16, padding: 24, transition: "all 0.2s", cursor: onClick ? "pointer" : "default", ...style }}>{children}</div>
-);
-
-const Modal = ({ children, onClose, title, width = 540 }) => (
-  <div style={{ position: "fixed", inset: 0, zIndex: 300, background: "rgba(26,23,20,0.55)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={onClose}>
-    <div style={{ background: C.cream, borderRadius: 20, width: "100%", maxWidth: width, maxHeight: "90vh", overflow: "auto", position: "relative", animation: "fadeUp 0.25s ease" }} onClick={e => e.stopPropagation()}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "20px 28px", borderBottom: `1px solid ${C.parchment}`, position: "sticky", top: 0, background: C.cream, zIndex: 1 }}>
-        <h3 style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 20, color: C.ink }}>{title}</h3>
-        <button onClick={onClose} style={{ background: C.parchment, border: "none", borderRadius: "50%", width: 32, height: 32, cursor: "pointer", fontSize: 18, color: C.muted, display: "flex", alignItems: "center", justifyContent: "center" }}>×</button>
-      </div>
-      <div style={{ padding: 28 }}>{children}</div>
-    </div>
-  </div>
-);
-
-// ─── Toast ────────────────────────────────────────────────────────────────────
-const Toast = ({ msg, type = "success" }) => (
-  <div style={{ position: "fixed", bottom: 28, left: "50%", transform: "translateX(-50%)", zIndex: 999, background: type === "success" ? C.forest : C.rose, color: "#fff", borderRadius: 12, padding: "12px 24px", fontWeight: 600, fontSize: 14, animation: "fadeUp 0.25s ease", boxShadow: "0 8px 32px rgba(0,0,0,0.25)", whiteSpace: "nowrap" }}>
-    {type === "success" ? "✓ " : "✕ "}{msg}
-  </div>
+const Spinner = () => (
+  <div style={{ width: 20, height: 20, border: `2px solid ${T.border}`, borderTopColor: T.accent, borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
 );
 
 // ─── NavBar ───────────────────────────────────────────────────────────────────
-function NavBar({ page, setPage, user, setUser }) {
-  const [scrolled, setScrolled] = useState(false);
-  useEffect(() => {
-    const h = () => setScrolled(window.scrollY > 10);
-    window.addEventListener("scroll", h);
-    return () => window.removeEventListener("scroll", h);
-  }, []);
-
-  const tabs = user?.role === "poster"
-    ? [["poster-dashboard","Dashboard"],["poster-jobs","My Listings"],["poster-applicants","Applicants"]]
-    : user?.role === "hunter"
-    ? [["hunter-jobs","Find Jobs"],["hunter-saved","Saved Jobs"],["hunter-profile","My Profile"],["paths","Career Paths"],["tutorial","Guide"]]
-    : [["landing","Home"],["hunter-jobs","Browse Jobs"],["paths","Career Paths"],["tutorial","Guide"]];
-
+function NavBar({ page, setPage }) {
   return (
-    <nav style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 200, background: scrolled ? "rgba(247,245,240,0.96)" : "transparent", backdropFilter: scrolled ? "blur(12px)" : "none", borderBottom: scrolled ? `1px solid ${C.parchment}` : "none", transition: "all 0.3s", padding: "0 2rem" }}>
-      <div style={{ maxWidth: 1200, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", height: 62 }}>
-        <button onClick={() => setPage("landing")} style={{ background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ width: 34, height: 34, background: C.forest, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", color: C.sage, fontFamily: "'Fraunces', serif", fontSize: 16, fontWeight: 900 }}>G</div>
-          <span style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 19, fontWeight: 900, color: C.ink, letterSpacing: "-0.5px" }}>GradLaunch</span>
+    <nav style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 100, background: "rgba(8,11,18,0.85)", backdropFilter: "blur(16px)", borderBottom: `1px solid ${T.border}`, padding: "0 2rem" }}>
+      <div style={{ maxWidth: 1200, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", height: 60 }}>
+        <button onClick={() => setPage("home")} style={{ background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ width: 30, height: 30, background: `linear-gradient(135deg, ${T.accent}, #9f7aea)`, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Instrument Serif', serif", fontSize: 16, fontWeight: 400, color: "#fff", fontStyle: "italic" }}>G</div>
+          <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 800, color: T.text, letterSpacing: "-0.5px" }}>GradLaunch</span>
         </button>
-
-        <div style={{ display: "flex", gap: 2 }}>
-          {tabs.map(([p, l]) => (
-            <button key={p} onClick={() => setPage(p)} style={{ background: page === p ? C.forest : "transparent", color: page === p ? C.cream : C.inkLight, border: "none", borderRadius: 8, padding: "7px 14px", cursor: "pointer", fontSize: 13, fontWeight: 600, transition: "all 0.18s" }}>{l}</button>
+        <div style={{ display: "flex", gap: 2, background: T.surface, borderRadius: 10, padding: 3, border: `1px solid ${T.border}` }}>
+          {[["home","✦ Job Finder"],["paths","Career Paths"],["guide","Job Hunt Guide"]].map(([p,l]) => (
+            <button key={p} onClick={() => setPage(p)} style={{ background: page === p ? T.surfaceHigh : "transparent", color: page === p ? T.text : T.textMid, border: page === p ? `1px solid ${T.border}` : "1px solid transparent", borderRadius: 7, padding: "7px 16px", cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "'Syne', sans-serif", transition: "all 0.18s", letterSpacing: 0.3 }}>{l}</button>
           ))}
         </div>
-
-        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          {user ? (
-            <>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <div style={{ width: 32, height: 32, borderRadius: "50%", background: user.role === "poster" ? C.amberPale : C.sagePale, border: `2px solid ${user.role === "poster" ? C.amber : C.moss}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 800, color: user.role === "poster" ? C.amber : C.moss }}>
-                  {user.name[0]}
-                </div>
-                <span style={{ fontSize: 13, fontWeight: 600, color: C.inkLight }}>{user.name.split(" ")[0]}</span>
-              </div>
-              <Btn variant="ghost" onClick={() => { setUser(null); setPage("landing"); }} style={{ padding: "7px 16px", fontSize: 12 }}>Sign Out</Btn>
-            </>
-          ) : (
-            <>
-              <Btn variant="ghost" onClick={() => setPage("login")} style={{ padding: "7px 16px", fontSize: 13 }}>Sign In</Btn>
-              <Btn variant="primary" onClick={() => setPage("signup")} style={{ padding: "7px 16px", fontSize: 13 }}>Join Free</Btn>
-            </>
-          )}
-        </div>
+        <div style={{ width: 120 }} />
       </div>
     </nav>
   );
 }
 
-// ─── Landing Page ─────────────────────────────────────────────────────────────
-function Landing({ setPage }) {
-  const [count, setCount] = useState(0);
-  useEffect(() => {
-    let t = 1247, c = 0, step = 22;
-    const timer = setInterval(() => { c = Math.min(c + step, t); setCount(c); if (c >= t) clearInterval(timer); }, 16);
-    return () => clearInterval(timer);
-  }, []);
-
-  return (
-    <div style={{ minHeight: "100vh", background: C.cream }}>
-      {/* Hero */}
-      <section style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "120px 2rem 80px", textAlign: "center", position: "relative", overflow: "hidden", background: `radial-gradient(ellipse 80% 50% at 50% -10%, ${C.sagePale} 0%, transparent 70%), ${C.cream}` }}>
-        <div style={{ position: "absolute", inset: 0, backgroundImage: `radial-gradient(circle, ${C.stone}30 1px, transparent 1px)`, backgroundSize: "32px 32px", pointerEvents: "none" }} />
-        <div style={{ position: "relative", maxWidth: 780, animation: "fadeUp 0.6s ease" }}>
-          <div style={{ display: "inline-flex", alignItems: "center", gap: 8, background: C.sagePale, border: `1px solid ${C.sage}`, borderRadius: 40, padding: "6px 18px", marginBottom: 32 }}>
-            <span style={{ width: 7, height: 7, borderRadius: "50%", background: C.moss, display: "inline-block", animation: "pulse 2s infinite" }} />
-            <span style={{ color: C.forest, fontSize: 12, fontWeight: 700, letterSpacing: 1 }}>{count.toLocaleString()} OPPORTUNITIES FOR FRESH GRADUATES</span>
-          </div>
-
-          <h1 style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: "clamp(2.8rem, 6vw, 5rem)", fontWeight: 900, color: C.ink, lineHeight: 1.08, marginBottom: 24, letterSpacing: "-2px" }}>
-            Your Degree Is<br />Your <span style={{ color: C.moss, textDecoration: "underline", textDecorationStyle: "wavy", textUnderlineOffset: 6 }}>Starting Line.</span>
-          </h1>
-
-          <p style={{ color: C.muted, fontSize: "clamp(1rem, 2vw, 1.18rem)", lineHeight: 1.75, marginBottom: 48, maxWidth: 560, margin: "0 auto 48px" }}>
-            Find jobs matched to your college degree, map your career path, and get practical guidance for your first job — all in one place.
-          </p>
-
-          <div style={{ display: "flex", gap: 14, justifyContent: "center", flexWrap: "wrap", marginBottom: 64 }}>
-            <Btn onClick={() => setPage("signup-hunter")} style={{ padding: "14px 32px", fontSize: 15, background: C.forest, color: C.cream, borderRadius: 12 }}>I'm Looking for a Job →</Btn>
-            <Btn variant="ghost" onClick={() => setPage("signup-poster")} style={{ padding: "14px 32px", fontSize: 15, borderRadius: 12 }}>I'm Hiring Fresh Grads</Btn>
-          </div>
-
-          <div style={{ display: "flex", gap: 48, justifyContent: "center", flexWrap: "wrap" }}>
-            {[["1,200+","Open Roles"],["300+","Companies Hiring"],["10","Degree Tracks"],["Free","Always"]].map(([n, l]) => (
-              <div key={l} style={{ textAlign: "center" }}>
-                <div style={{ fontFamily: "'Fraunces', serif", fontSize: 30, fontWeight: 900, color: C.forest }}>{n}</div>
-                <div style={{ color: C.muted, fontSize: 12, fontWeight: 600, letterSpacing: 0.5 }}>{l}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Two paths */}
-      <section style={{ background: C.ink, padding: "80px 2rem" }}>
-        <div style={{ maxWidth: 1000, margin: "0 auto", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
-          {[
-            { role: "hunter", icon: "🎓", title: "Job Hunters", sub: "Fresh Graduates", color: C.sage, bg: C.forest, items: ["Browse degree-matched jobs","Save your favorite listings","Apply directly on GradLaunch","Build your grad profile","Career path roadmaps","Step-by-step job hunting guide"] },
-            { role: "poster", icon: "🏢", title: "Employers", sub: "Companies & Recruiters", color: C.amber, bg: "#2a1f0a", items: ["Post job listings in minutes","Reach 1,200+ fresh graduates","Edit or close listings anytime","View all applicants per role","Company profile page","100% free — always"] },
-          ].map(card => (
-            <div key={card.role} style={{ background: card.bg, border: `1px solid rgba(255,255,255,0.08)`, borderRadius: 20, padding: 36, cursor: "pointer" }} onClick={() => setPage(`signup-${card.role}`)}>
-              <div style={{ fontSize: 40, marginBottom: 16 }}>{card.icon}</div>
-              <div style={{ color: card.color, fontSize: 11, fontWeight: 700, letterSpacing: 2, marginBottom: 6 }}>{card.sub.toUpperCase()}</div>
-              <h2 style={{ fontFamily: "'Fraunces', serif", color: "#fff", fontSize: 28, marginBottom: 20 }}>{card.title}</h2>
-              <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 28 }}>
-                {card.items.map(it => <div key={it} style={{ display: "flex", gap: 10, alignItems: "center", color: "rgba(255,255,255,0.65)", fontSize: 13 }}><span style={{ color: card.color }}>✓</span>{it}</div>)}
-              </div>
-              <div style={{ display: "inline-flex", alignItems: "center", gap: 6, color: card.color, fontWeight: 700, fontSize: 14 }}>Get Started →</div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Features */}
-      <section style={{ padding: "80px 2rem", background: C.parchment }}>
-        <div style={{ maxWidth: 1100, margin: "0 auto" }}>
-          <div style={{ textAlign: "center", marginBottom: 56 }}>
-            <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: "clamp(1.8rem,3.5vw,2.8rem)", color: C.ink, marginBottom: 12 }}>Built for Day One</h2>
-            <p style={{ color: C.muted, fontSize: 15, maxWidth: 500, margin: "0 auto" }}>Everything a fresh graduate needs to launch a career with confidence.</p>
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px,1fr))", gap: 24 }}>
-            {[{i:"🎯",t:"Degree-Matched Jobs",d:"Every listing tagged to your college course. No guessing."},{i:"🗺️",t:"Career Path Maps",d:"See where your first job leads — salaries, promotions, timelines."},{i:"📖",t:"Job Hunting 101",d:"Step-by-step guides on resumes, interviews, and negotiation."},{i:"🤝",t:"Fresh Grad Friendly",d:"All companies actively welcome zero-experience applicants."}].map(f => (
-              <Card key={f.t} style={{ textAlign: "center" }}>
-                <div style={{ fontSize: 36, marginBottom: 16 }}>{f.i}</div>
-                <h3 style={{ fontFamily: "'Fraunces', serif", color: C.ink, fontSize: 17, marginBottom: 8 }}>{f.t}</h3>
-                <p style={{ color: C.muted, fontSize: 13, lineHeight: 1.6 }}>{f.d}</p>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <Footer setPage={setPage} />
-    </div>
-  );
-}
-
-// ─── Auth Pages ───────────────────────────────────────────────────────────────
-function AuthPage({ mode, setPage, setUser, showToast }) {
-  const isLogin = mode === "login";
-  const [role, setRole] = useState("hunter");
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [degree, setDegree] = useState(DEGREES[0]);
-  const [company, setCompany] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  // Pre-fill role from signup-hunter / signup-poster
-  useEffect(() => {
-    if (mode === "signup-hunter") setRole("hunter");
-    if (mode === "signup-poster") setRole("poster");
-  }, [mode]);
-
-  const handleSubmit = () => {
-    if (!email || (!isLogin && !name)) { showToast("Please fill in all required fields.", "error"); return; }
-    setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      const user = { name: name || email.split("@")[0], email, role, degree: role === "hunter" ? degree : null, company: role === "poster" ? company : null, savedJobs: [], applications: [], postedJobs: [] };
-      setUser(user);
-      showToast(`Welcome${isLogin ? " back" : ""}, ${user.name.split(" ")[0]}!`);
-      setPage(role === "poster" ? "poster-dashboard" : "hunter-jobs");
-    }, 900);
-  };
-
-  return (
-    <div style={{ minHeight: "100vh", background: C.cream, display: "flex", alignItems: "center", justifyContent: "center", padding: "100px 2rem 60px" }}>
-      <div style={{ width: "100%", maxWidth: 440, animation: "fadeUp 0.4s ease" }}>
-        <div style={{ textAlign: "center", marginBottom: 40 }}>
-          <div style={{ width: 48, height: 48, background: C.forest, borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center", color: C.sage, fontFamily: "'Fraunces', serif", fontSize: 22, fontWeight: 900, margin: "0 auto 16px" }}>G</div>
-          <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: 28, color: C.ink, marginBottom: 6 }}>{isLogin ? "Welcome back" : "Create your account"}</h1>
-          <p style={{ color: C.muted, fontSize: 14 }}>{isLogin ? "Sign in to continue to GradLaunch" : "Free forever. No credit card needed."}</p>
-        </div>
-
-        <Card style={{ padding: 32 }}>
-          {!isLogin && (
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 24 }}>
-              {[["hunter","🎓 Job Hunter"],["poster","🏢 Employer"]].map(([r, l]) => (
-                <button key={r} onClick={() => setRole(r)} style={{ padding: "10px", borderRadius: 10, border: `2px solid ${role === r ? C.forest : C.parchment}`, background: role === r ? C.sagePale : "#fff", color: role === r ? C.forest : C.muted, fontWeight: 700, fontSize: 13, cursor: "pointer", transition: "all 0.18s" }}>{l}</button>
-              ))}
-            </div>
-          )}
-
-          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            {!isLogin && <Input label="Full Name" value={name} onChange={setName} placeholder="Juan dela Cruz" required />}
-            <Input label="Email Address" value={email} onChange={setEmail} placeholder="you@email.com" type="email" required />
-            <Input label="Password" value={password} onChange={setPassword} placeholder="Min. 8 characters" type="password" required />
-            {!isLogin && role === "hunter" && <Select label="Your Degree" value={degree} onChange={setDegree} options={DEGREES} />}
-            {!isLogin && role === "poster" && <Input label="Company Name" value={company} onChange={setCompany} placeholder="Your company name" />}
-          </div>
-
-          <Btn onClick={handleSubmit} disabled={loading} style={{ width: "100%", marginTop: 24, padding: "13px", fontSize: 15, background: C.forest, color: C.cream, borderRadius: 12 }}>
-            {loading ? "Please wait…" : isLogin ? "Sign In" : "Create Account"}
-          </Btn>
-
-          <p style={{ textAlign: "center", marginTop: 20, fontSize: 13, color: C.muted }}>
-            {isLogin ? "No account yet? " : "Already have an account? "}
-            <button onClick={() => setPage(isLogin ? "signup" : "login")} style={{ background: "none", border: "none", color: C.forest, fontWeight: 700, cursor: "pointer", fontSize: 13 }}>
-              {isLogin ? "Sign up free" : "Sign in"}
-            </button>
-          </p>
-        </Card>
-      </div>
-    </div>
-  );
-}
-
-// ─── Job Card ─────────────────────────────────────────────────────────────────
-function JobCard({ job, onView, onSave, savedIds = [], showSave = false }) {
-  const isSaved = savedIds.includes(job.id);
-  const [hov, setHov] = useState(false);
-  return (
-    <Card style={{ cursor: "pointer", transform: hov ? "translateY(-3px)" : "none", boxShadow: hov ? "0 12px 32px rgba(0,0,0,0.1)" : "none", borderColor: hov ? C.stone : C.parchment }}
-      onClick={() => onView(job)} onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}>
-      <div style={{ display: "flex", gap: 14, marginBottom: 14 }}>
-        <div style={{ width: 46, height: 46, borderRadius: 12, background: job.color + "18", border: `1.5px solid ${job.color}33`, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 13, color: job.color, flexShrink: 0 }}>{job.logo}</div>
-        <div style={{ flex: 1 }}>
-          <h3 style={{ fontFamily: "'Fraunces', serif", fontSize: 16, color: C.ink, marginBottom: 2 }}>{job.title}</h3>
-          <p style={{ color: C.muted, fontSize: 12 }}>{job.company} · {job.location}</p>
-        </div>
-        {showSave && (
-          <button onClick={e => { e.stopPropagation(); onSave(job.id); }} style={{ background: isSaved ? C.amberPale : C.parchment, border: "none", borderRadius: 8, width: 34, height: 34, cursor: "pointer", fontSize: 16, transition: "all 0.18s", flexShrink: 0 }}>{isSaved ? "★" : "☆"}</button>
-        )}
-      </div>
-      <p style={{ color: C.muted, fontSize: 13, lineHeight: 1.6, marginBottom: 14 }}>{job.description.slice(0, 100)}…</p>
-      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 14 }}>
-        {job.tags.map(t => <Badge key={t} color={C.forest} bg={C.sagePale}>{t}</Badge>)}
-      </div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span style={{ color: C.forest, fontWeight: 800, fontSize: 13 }}>{job.salary}</span>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <Badge color={C.muted} bg={C.parchment}>{job.posted}</Badge>
-          <Badge color={job.color} bg={job.color + "18"}>{job.degree}</Badge>
-        </div>
-      </div>
-    </Card>
-  );
-}
-
-// ─── Job Detail Modal ─────────────────────────────────────────────────────────
-function JobDetailModal({ job, onClose, onApply, onSave, savedIds = [], applied = false, showApply = true }) {
-  const [resumeFile, setResumeFile] = useState(null);
-  const [coverLetter, setCoverLetter] = useState("");
-  const [applying, setApplying] = useState(false);
-  const [step, setStep] = useState("view"); // view | apply
+// ─── Home / Job Finder ────────────────────────────────────────────────────────
+function Home() {
+  const [stage, setStage] = useState("upload"); // upload | filters | loading | results
+  const [file, setFile] = useState(null);
+  const [base64, setBase64] = useState(null);
+  const [filters, setFilters] = useState({ location: "Metro Manila", type: "Full-time", salary: "Any" });
+  const [results, setResults] = useState(null);
+  const [profile, setProfile] = useState(null);
+  const [loadMsg, setLoadMsg] = useState("Reading your resume…");
+  const [dragOver, setDragOver] = useState(false);
+  const [openCard, setOpenCard] = useState(null);
   const fileRef = useRef();
-  if (!job) return null;
 
-  const handleApply = () => {
-    setApplying(true);
-    setTimeout(() => { setApplying(false); onApply(job.id); onClose(); }, 1000);
+  const handleFile = (f) => {
+    if (!f) return;
+    setFile(f);
+    const reader = new FileReader();
+    reader.onload = (e) => { setBase64(e.target.result.split(",")[1]); };
+    reader.readAsDataURL(f);
   };
 
-  return (
-    <Modal title={step === "apply" ? "Apply for this Role" : job.title} onClose={onClose} width={600}>
-      {step === "view" ? (
-        <>
-          <div style={{ display: "flex", gap: 14, marginBottom: 24 }}>
-            <div style={{ width: 56, height: 56, borderRadius: 14, background: job.color + "18", border: `2px solid ${job.color}33`, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 15, color: job.color }}>{job.logo}</div>
-            <div><h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 22, color: C.ink, marginBottom: 3 }}>{job.title}</h2><p style={{ color: C.muted, fontSize: 13 }}>{job.company} · {job.location}</p></div>
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 24 }}>
-            {[["📍 Location",job.location],["💰 Salary",job.salary],["📋 Type",job.type],["🎓 Degree",job.degree],["👥 Applicants",`${job.applicants} applied`],["🕐 Posted",job.posted]].map(([k,v]) => (
-              <div key={k} style={{ background: C.parchment, borderRadius: 10, padding: "12px 14px" }}><div style={{ fontSize: 11, color: C.muted, marginBottom: 3 }}>{k}</div><div style={{ fontSize: 13, fontWeight: 700, color: C.ink }}>{v}</div></div>
-            ))}
-          </div>
-          <p style={{ color: C.inkLight, fontSize: 14, lineHeight: 1.75, marginBottom: 20 }}>{job.description} Fresh graduates with a strong academic background and willingness to learn are highly encouraged. We offer mentorship, training allowance, and a clear promotion path within 12 months.</p>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 24 }}>
-            {job.tags.map(t => <Badge key={t} color={C.forest} bg={C.sagePale}>{t}</Badge>)}
-          </div>
-          {showApply && (
-            <div style={{ display: "flex", gap: 10 }}>
-              {applied ? <Btn variant="sage" disabled style={{ flex: 1, padding: 13 }}>✓ Already Applied</Btn>
-                : <Btn onClick={() => setStep("apply")} style={{ flex: 1, padding: 13, background: C.forest, color: C.cream, borderRadius: 12 }}>Apply Now →</Btn>}
-              <Btn variant="ghost" onClick={() => onSave(job.id)} style={{ padding: "13px 16px" }}>{savedIds.includes(job.id) ? "★ Saved" : "☆ Save"}</Btn>
-            </div>
-          )}
-        </>
-      ) : (
-        <>
-          <p style={{ color: C.muted, fontSize: 13, marginBottom: 24 }}>Applying for <strong style={{ color: C.ink }}>{job.title}</strong> at <strong style={{ color: C.ink }}>{job.company}</strong></p>
-          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            <div>
-              <label style={{ fontSize: 12, fontWeight: 700, color: C.inkLight, letterSpacing: 0.5, textTransform: "uppercase", display: "block", marginBottom: 8 }}>Upload Resume (PDF) <span style={{ color: C.rose }}>*</span></label>
-              <div onClick={() => fileRef.current.click()} style={{ border: `2px dashed ${resumeFile ? C.moss : C.stone}`, borderRadius: 12, padding: "24px", textAlign: "center", cursor: "pointer", background: resumeFile ? C.sagePale : C.parchment, transition: "all 0.18s" }}>
-                <div style={{ fontSize: 28, marginBottom: 6 }}>{resumeFile ? "📄" : "⬆️"}</div>
-                <p style={{ color: resumeFile ? C.forest : C.muted, fontSize: 13, fontWeight: resumeFile ? 700 : 400 }}>{resumeFile ? resumeFile.name : "Click to upload your resume"}</p>
-              </div>
-              <input ref={fileRef} type="file" accept=".pdf,.doc,.docx" style={{ display: "none" }} onChange={e => setResumeFile(e.target.files[0])} />
-            </div>
-            <Textarea label="Cover Letter (Optional)" value={coverLetter} onChange={setCoverLetter} placeholder="Tell the employer why you're a great fit for this role…" rows={5} />
-          </div>
-          <div style={{ display: "flex", gap: 10, marginTop: 24 }}>
-            <Btn variant="ghost" onClick={() => setStep("view")} style={{ padding: 13 }}>← Back</Btn>
-            <Btn onClick={handleApply} disabled={applying || !resumeFile} style={{ flex: 1, padding: 13, background: C.forest, color: C.cream, borderRadius: 12 }}>
-              {applying ? "Submitting…" : "Submit Application →"}
-            </Btn>
-          </div>
-        </>
-      )}
-    </Modal>
-  );
-}
-
-// ─── Hunter: Find Jobs ────────────────────────────────────────────────────────
-function HunterJobs({ user, setUser, showToast }) {
-  const [jobs, setJobs] = useState(SEED_JOBS);
-  const [filter, setFilter] = useState("");
-  const [selected, setSelected] = useState(null);
-
-  const handleSave = (id) => {
-    if (!user) { showToast("Sign in to save jobs.", "error"); return; }
-    setUser(u => { const saved = u.savedJobs.includes(id) ? u.savedJobs.filter(x => x !== id) : [...u.savedJobs, id]; showToast(saved.includes(id) ? "Job saved!" : "Job removed."); return { ...u, savedJobs: saved }; });
-  };
-
-  const handleApply = (id) => {
-    setUser(u => { showToast("Application submitted! 🎉"); return { ...u, applications: [...(u.applications || []), { jobId: id, date: new Date().toLocaleDateString(), status: "Under Review" }] }; });
-  };
-
-  const filtered = filter ? jobs.filter(j => j.degree === filter) : jobs;
-  const appliedIds = user?.applications?.map(a => a.jobId) || [];
-
-  return (
-    <div style={{ minHeight: "100vh", background: C.cream, paddingTop: 80 }}>
-      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "50px 2rem" }}>
-        <div style={{ marginBottom: 40 }}>
-          <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: "clamp(2rem,4vw,2.8rem)", color: C.ink, marginBottom: 8 }}>Find Your First Role</h1>
-          <p style={{ color: C.muted, fontSize: 15 }}>Every listing is fresh-graduate friendly and matched to your degree.</p>
-        </div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 36 }}>
-          <button onClick={() => setFilter("")} style={{ padding: "8px 18px", borderRadius: 24, border: `1.5px solid ${!filter ? C.forest : C.stone}`, background: !filter ? C.sagePale : "transparent", color: !filter ? C.forest : C.muted, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>All Degrees</button>
-          {DEGREES.slice(0, 7).map(d => <button key={d} onClick={() => setFilter(d)} style={{ padding: "8px 18px", borderRadius: 24, border: `1.5px solid ${filter === d ? C.forest : C.stone}`, background: filter === d ? C.sagePale : "transparent", color: filter === d ? C.forest : C.muted, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>{d}</button>)}
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(330px,1fr))", gap: 20 }}>
-          {filtered.map(j => <JobCard key={j.id} job={j} onView={setSelected} onSave={handleSave} savedIds={user?.savedJobs || []} showSave={!!user} />)}
-        </div>
-      </div>
-      {selected && <JobDetailModal job={selected} onClose={() => setSelected(null)} onApply={handleApply} onSave={handleSave} savedIds={user?.savedJobs || []} applied={appliedIds.includes(selected.id)} showApply={!!user} />}
-    </div>
-  );
-}
-
-// ─── Hunter: Saved Jobs ───────────────────────────────────────────────────────
-function HunterSaved({ user, setUser, showToast }) {
-  const [selected, setSelected] = useState(null);
-  const savedJobs = SEED_JOBS.filter(j => user?.savedJobs?.includes(j.id));
-  const handleSave = (id) => { setUser(u => ({ ...u, savedJobs: u.savedJobs.filter(x => x !== id) })); showToast("Job removed from saved."); };
-  const handleApply = (id) => { setUser(u => { showToast("Application submitted! 🎉"); return { ...u, applications: [...(u.applications || []), { jobId: id, date: new Date().toLocaleDateString(), status: "Under Review" }] }; }); };
-
-  return (
-    <div style={{ minHeight: "100vh", background: C.cream, paddingTop: 80 }}>
-      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "50px 2rem" }}>
-        <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: "clamp(2rem,4vw,2.8rem)", color: C.ink, marginBottom: 8 }}>Saved Jobs</h1>
-        <p style={{ color: C.muted, fontSize: 15, marginBottom: 40 }}>Jobs you've bookmarked for later.</p>
-        {savedJobs.length === 0
-          ? <Card style={{ textAlign: "center", padding: 64 }}><div style={{ fontSize: 48, marginBottom: 16 }}>☆</div><p style={{ color: C.muted }}>No saved jobs yet. Star a job to save it here.</p></Card>
-          : <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(330px,1fr))", gap: 20 }}>
-              {savedJobs.map(j => <JobCard key={j.id} job={j} onView={setSelected} onSave={handleSave} savedIds={user?.savedJobs || []} showSave />)}
-            </div>
-        }
-      </div>
-      {selected && <JobDetailModal job={selected} onClose={() => setSelected(null)} onApply={handleApply} onSave={handleSave} savedIds={user?.savedJobs || []} applied={(user?.applications || []).map(a => a.jobId).includes(selected?.id)} showApply />}
-    </div>
-  );
-}
-
-// ─── Hunter: Profile ──────────────────────────────────────────────────────────
-function HunterProfile({ user, setUser, showToast }) {
-  const [name, setName] = useState(user?.name || "");
-  const [bio, setBio] = useState(user?.bio || "");
-  const [location, setLocation] = useState(user?.location || "");
-  const [degree, setDegree] = useState(user?.degree || DEGREES[0]);
-  const [school, setSchool] = useState(user?.school || "");
-  const [skills, setSkills] = useState(user?.skills || "");
-  const [editing, setEditing] = useState(false);
-  const applications = user?.applications || [];
-
-  const save = () => {
-    setUser(u => ({ ...u, name, bio, location, degree, school, skills }));
-    setEditing(false);
-    showToast("Profile updated!");
-  };
-
-  return (
-    <div style={{ minHeight: "100vh", background: C.cream, paddingTop: 80 }}>
-      <div style={{ maxWidth: 900, margin: "0 auto", padding: "50px 2rem", display: "grid", gridTemplateColumns: "280px 1fr", gap: 24 }}>
-        {/* sidebar */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-          <Card style={{ textAlign: "center", padding: 28 }}>
-            <div style={{ width: 72, height: 72, borderRadius: "50%", background: C.sagePale, border: `3px solid ${C.moss}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28, fontWeight: 900, color: C.forest, margin: "0 auto 16px", fontFamily: "'Fraunces', serif" }}>{user?.name?.[0]}</div>
-            <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 20, color: C.ink, marginBottom: 4 }}>{user?.name}</h2>
-            <p style={{ color: C.muted, fontSize: 13, marginBottom: 12 }}>{user?.degree}</p>
-            <Badge color={C.forest} bg={C.sagePale}>Job Hunter</Badge>
-          </Card>
-          <Card>
-            <h3 style={{ fontFamily: "'Fraunces', serif", fontSize: 16, color: C.ink, marginBottom: 16 }}>My Applications</h3>
-            {applications.length === 0
-              ? <p style={{ color: C.muted, fontSize: 13 }}>No applications yet.</p>
-              : applications.map((a, i) => {
-                  const job = SEED_JOBS.find(j => j.id === a.jobId);
-                  return job ? (
-                    <div key={i} style={{ padding: "10px 0", borderBottom: i < applications.length - 1 ? `1px solid ${C.parchment}` : "none" }}>
-                      <p style={{ fontWeight: 700, fontSize: 13, color: C.ink }}>{job.title}</p>
-                      <p style={{ fontSize: 11, color: C.muted }}>{job.company}</p>
-                      <Badge color={C.amber} bg={C.amberPale}>{a.status}</Badge>
-                    </div>
-                  ) : null;
-                })}
-          </Card>
-        </div>
-
-        {/* main */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-          <Card>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-              <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 20, color: C.ink }}>My Profile</h2>
-              {!editing ? <Btn variant="ghost" onClick={() => setEditing(true)} style={{ fontSize: 13 }}>Edit Profile</Btn>
-                : <div style={{ display: "flex", gap: 8 }}><Btn variant="ghost" onClick={() => setEditing(false)} style={{ fontSize: 13 }}>Cancel</Btn><Btn onClick={save} style={{ fontSize: 13, background: C.forest, color: C.cream }}>Save Changes</Btn></div>}
-            </div>
-            {editing ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                <Input label="Full Name" value={name} onChange={setName} />
-                <Textarea label="Bio / Summary" value={bio} onChange={setBio} placeholder="A fresh Computer Science graduate passionate about building products…" rows={3} />
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-                  <Input label="Location" value={location} onChange={setLocation} placeholder="Quezon City, PH" />
-                  <Select label="Degree" value={degree} onChange={setDegree} options={DEGREES} />
-                </div>
-                <Input label="School / University" value={school} onChange={setSchool} placeholder="University of the Philippines" />
-                <Input label="Skills (comma-separated)" value={skills} onChange={setSkills} placeholder="JavaScript, Figma, Excel…" />
-              </div>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                {[["Name", user?.name],["Email", user?.email],["Location", user?.location || "—"],["Degree", user?.degree],["School", user?.school || "—"],["Bio", user?.bio || "—"]].map(([k,v]) => (
-                  <div key={k} style={{ display: "flex", gap: 16 }}>
-                    <span style={{ minWidth: 80, fontSize: 12, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: 0.5, paddingTop: 1 }}>{k}</span>
-                    <span style={{ fontSize: 14, color: C.ink }}>{v}</span>
-                  </div>
-                ))}
-                {user?.skills && <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>{user.skills.split(",").map(s => <Badge key={s} color={C.forest} bg={C.sagePale}>{s.trim()}</Badge>)}</div>}
-              </div>
-            )}
-          </Card>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Poster: Dashboard ────────────────────────────────────────────────────────
-function PosterDashboard({ user }) {
-  const myJobs = SEED_JOBS.filter(j => j.companyId === "c1").slice(0, 2);
-  const stats = [["Active Listings", myJobs.length, "📋"], ["Total Applicants", myJobs.reduce((a, j) => a + j.applicants, 0), "👥"], ["Views This Week", 142, "👁️"], ["Avg. Time to Hire", "12 days", "⏱️"]];
-  return (
-    <div style={{ minHeight: "100vh", background: C.cream, paddingTop: 80 }}>
-      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "50px 2rem" }}>
-        <div style={{ marginBottom: 40 }}>
-          <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: "clamp(2rem,4vw,2.8rem)", color: C.ink, marginBottom: 6 }}>Welcome back, {user?.name?.split(" ")[0]} 👋</h1>
-          <p style={{ color: C.muted, fontSize: 15 }}>Here's an overview of your hiring activity on GradLaunch.</p>
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px,1fr))", gap: 16, marginBottom: 40 }}>
-          {stats.map(([label, val, icon]) => (
-            <Card key={label} style={{ textAlign: "center" }}>
-              <div style={{ fontSize: 32, marginBottom: 8 }}>{icon}</div>
-              <div style={{ fontFamily: "'Fraunces', serif", fontSize: 32, fontWeight: 900, color: C.forest, marginBottom: 4 }}>{val}</div>
-              <div style={{ color: C.muted, fontSize: 12, fontWeight: 600 }}>{label}</div>
-            </Card>
-          ))}
-        </div>
-        <Card>
-          <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 18, color: C.ink, marginBottom: 20 }}>Recent Listings Performance</h2>
-          {myJobs.map(j => (
-            <div key={j.id} style={{ display: "flex", alignItems: "center", gap: 16, padding: "16px 0", borderBottom: `1px solid ${C.parchment}` }}>
-              <div style={{ width: 40, height: 40, borderRadius: 10, background: j.color + "18", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 12, color: j.color }}>{j.logo}</div>
-              <div style={{ flex: 1 }}>
-                <p style={{ fontWeight: 700, color: C.ink, fontSize: 14 }}>{j.title}</p>
-                <p style={{ color: C.muted, fontSize: 12 }}>{j.degree} · {j.location}</p>
-              </div>
-              <div style={{ textAlign: "center" }}><div style={{ fontFamily: "'Fraunces', serif", fontSize: 20, color: C.forest }}>{j.applicants}</div><div style={{ color: C.muted, fontSize: 11 }}>applicants</div></div>
-              <Badge color={C.moss} bg={C.sagePale}>Active</Badge>
-            </div>
-          ))}
-        </Card>
-      </div>
-    </div>
-  );
-}
-
-// ─── Poster: My Listings ──────────────────────────────────────────────────────
-function PosterListings({ user, setUser, showToast }) {
-  const [jobs, setJobs] = useState([]);
-  const [showForm, setShowForm] = useState(false);
-  const [editing, setEditing] = useState(null);
-  const [form, setForm] = useState({ title: "", degree: DEGREES[0], location: "", salary: "", type: "Full-time", tags: "", description: "" });
-  const f = (k) => (v) => setForm(p => ({ ...p, [k]: v }));
-
-  const submit = () => {
-    if (!form.title || !form.description) { showToast("Title and description are required.", "error"); return; }
-    if (editing !== null) {
-      setJobs(j => j.map((job, i) => i === editing ? { ...job, ...form, tags: form.tags.split(",").map(t => t.trim()).filter(Boolean) } : job));
-      showToast("Listing updated!");
-    } else {
-      setJobs(j => [...j, { ...form, id: Date.now(), logo: user?.company?.[0]?.toUpperCase() || "C", color: C.sky, applicants: 0, posted: "Just now", tags: form.tags.split(",").map(t => t.trim()).filter(Boolean) }]);
-      showToast("Job posted! 🎉");
-    }
-    setShowForm(false); setEditing(null); setForm({ title: "", degree: DEGREES[0], location: "", salary: "", type: "Full-time", tags: "", description: "" });
-  };
-
-  const del = (i) => { setJobs(j => j.filter((_, idx) => idx !== i)); showToast("Listing deleted."); };
-  const edit = (i) => { const j = jobs[i]; setForm({ ...j, tags: j.tags.join(", ") }); setEditing(i); setShowForm(true); };
-
-  return (
-    <div style={{ minHeight: "100vh", background: C.cream, paddingTop: 80 }}>
-      <div style={{ maxWidth: 1000, margin: "0 auto", padding: "50px 2rem" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 36, flexWrap: "wrap", gap: 16 }}>
-          <div>
-            <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: "clamp(2rem,4vw,2.8rem)", color: C.ink, marginBottom: 6 }}>My Listings</h1>
-            <p style={{ color: C.muted, fontSize: 15 }}>Post and manage your job openings.</p>
-          </div>
-          <Btn onClick={() => { setEditing(null); setForm({ title: "", degree: DEGREES[0], location: "", salary: "", type: "Full-time", tags: "", description: "" }); setShowForm(true); }} style={{ background: C.forest, color: C.cream, padding: "12px 24px", borderRadius: 12 }}>+ Post New Job</Btn>
-        </div>
-
-        {jobs.length === 0
-          ? <Card style={{ textAlign: "center", padding: 64 }}><div style={{ fontSize: 48, marginBottom: 16 }}>📋</div><p style={{ color: C.muted, marginBottom: 24 }}>No listings yet. Post your first job to reach fresh graduates!</p><Btn onClick={() => setShowForm(true)} style={{ background: C.forest, color: C.cream }}>Post a Job</Btn></Card>
-          : <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-              {jobs.map((j, i) => (
-                <Card key={j.id} style={{ display: "flex", alignItems: "center", gap: 16 }}>
-                  <div style={{ width: 44, height: 44, borderRadius: 11, background: j.color + "18", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 13, color: j.color }}>{j.logo}</div>
-                  <div style={{ flex: 1 }}>
-                    <p style={{ fontWeight: 700, fontSize: 15, color: C.ink }}>{j.title}</p>
-                    <p style={{ color: C.muted, fontSize: 12 }}>{j.degree} · {j.location} · {j.posted}</p>
-                  </div>
-                  <div style={{ textAlign: "center", minWidth: 60 }}><div style={{ fontFamily: "'Fraunces', serif", fontSize: 22, color: C.forest }}>{j.applicants}</div><div style={{ color: C.muted, fontSize: 11 }}>applicants</div></div>
-                  <Badge color={C.moss} bg={C.sagePale}>Active</Badge>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <Btn variant="ghost" onClick={() => edit(i)} style={{ fontSize: 12, padding: "7px 14px" }}>Edit</Btn>
-                    <Btn variant="danger" onClick={() => del(i)} style={{ fontSize: 12, padding: "7px 14px" }}>Delete</Btn>
-                  </div>
-                </Card>
-              ))}
-            </div>
-        }
-      </div>
-
-      {showForm && (
-        <Modal title={editing !== null ? "Edit Job Listing" : "Post a New Job"} onClose={() => { setShowForm(false); setEditing(null); }} width={580}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            <Input label="Job Title" value={form.title} onChange={f("title")} placeholder="e.g. Junior Software Developer" required />
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-              <Select label="Degree Required" value={form.degree} onChange={f("degree")} options={DEGREES} />
-              <Select label="Employment Type" value={form.type} onChange={f("type")} options={["Full-time","Part-time","Internship","Contract"]} />
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-              <Input label="Location" value={form.location} onChange={f("location")} placeholder="Makati, Metro Manila" />
-              <Input label="Salary Range" value={form.salary} onChange={f("salary")} placeholder="₱20,000–₱28,000/mo" />
-            </div>
-            <Input label="Tags (comma-separated)" value={form.tags} onChange={f("tags")} placeholder="React, Entry Level, Fresh Grads OK" />
-            <Textarea label="Job Description" value={form.description} onChange={f("description")} placeholder="Describe the role, responsibilities, and what kind of fresh grad you're looking for…" rows={5} required />
-          </div>
-          <div style={{ display: "flex", gap: 10, marginTop: 24 }}>
-            <Btn variant="ghost" onClick={() => { setShowForm(false); setEditing(null); }} style={{ flex: 1, padding: 13 }}>Cancel</Btn>
-            <Btn onClick={submit} style={{ flex: 2, padding: 13, background: C.forest, color: C.cream, borderRadius: 12 }}>{editing !== null ? "Save Changes" : "Post Job →"}</Btn>
-          </div>
-        </Modal>
-      )}
-    </div>
-  );
-}
-
-// ─── Poster: Applicants ───────────────────────────────────────────────────────
-function PosterApplicants() {
-  const mockApplicants = [
-    { name: "Maria Santos", degree: "Computer Science", school: "DLSU", applied: "2 days ago", job: "Junior Software Developer", status: "Under Review" },
-    { name: "Juan dela Cruz", degree: "Computer Science", school: "UP Diliman", applied: "1 day ago", job: "Junior Software Developer", status: "Shortlisted" },
-    { name: "Ana Reyes", degree: "Business Administration", school: "Ateneo", applied: "3 days ago", job: "Marketing Associate", status: "Interviewed" },
+  const LOAD_MESSAGES = [
+    "Reading your resume…",
+    "Extracting your skills and degree…",
+    "Building your candidate profile…",
+    "Crafting job search queries…",
+    "Scanning Philippine job boards…",
+    "Matching roles to your background…",
+    "Generating match explanations…",
+    "Almost ready…",
   ];
-  const statusColor = { "Under Review": [C.amber, C.amberPale], "Shortlisted": [C.moss, C.sagePale], "Interviewed": [C.sky, C.skyPale] };
+
+  const runSearch = async () => {
+    if (!base64) return;
+    setStage("loading");
+    let msgIdx = 0;
+    const msgTimer = setInterval(() => {
+      msgIdx = Math.min(msgIdx + 1, LOAD_MESSAGES.length - 1);
+      setLoadMsg(LOAD_MESSAGES[msgIdx]);
+    }, 2200);
+
+    try {
+      // Step 1: Parse resume with Claude
+      const parseRes = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 1000,
+          system: `You are a resume parser. Extract structured info from the resume and return ONLY valid JSON, no markdown, no explanation. Format:
+{
+  "name": "string",
+  "degree": "string (e.g. Computer Science)",
+  "school": "string",
+  "skills": ["skill1","skill2"],
+  "experiences": ["brief description"],
+  "summary": "2-sentence profile summary",
+  "searchQueries": ["query1 site:jobstreet.com.ph OR site:onlinejobs.ph", "query2 site:linkedin.com/jobs", "query3 site:kalibrr.com"]
+}
+The searchQueries should be 3 highly targeted Google search queries to find real job listings in the Philippines for this person. Include site: operators for major PH job boards.`,
+          messages: [{
+            role: "user",
+            content: [
+              { type: "document", source: { type: "base64", media_type: "application/pdf", data: base64 } },
+              { type: "text", text: `Parse this resume. Location preference: ${filters.location}. Job type: ${filters.type}. Salary expectation: ${filters.salary}.` }
+            ]
+          }]
+        })
+      });
+      const parseData = await parseRes.json();
+      const parsed = JSON.parse(parseData.content[0].text);
+      setProfile(parsed);
+
+      // Step 2: Find real jobs via web search
+      const searchRes = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 1000,
+          tools: [{ type: "web_search_20250305", name: "web_search" }],
+          system: `You are a Philippine job search assistant for fresh graduates. Search for REAL, CURRENT job listings on Philippine job boards (JobStreet PH, OnlineJobs.ph, Kalibrr, LinkedIn PH, Jobbank PH). 
+Return ONLY a JSON array of 8 jobs. No markdown, no explanation. Each job:
+{
+  "title": "exact job title",
+  "company": "company name",
+  "location": "city, PH",
+  "salary": "salary range or 'Competitive'",
+  "platform": "JobStreet" | "OnlineJobs.ph" | "LinkedIn" | "Kalibrr" | "JobBank",
+  "url": "direct URL to the job post",
+  "matchScore": 85,
+  "matchReason": "2-sentence explanation of why this fits the candidate",
+  "tags": ["tag1","tag2","tag3"],
+  "type": "Full-time"
+}
+Only return real URLs that actually exist on these platforms. If unsure of exact URL, use the platform search URL with the job title as query.`,
+          messages: [{
+            role: "user",
+            content: `Find 8 real job listings in the Philippines for this fresh graduate:
+Degree: ${parsed.degree}
+Skills: ${parsed.skills?.join(", ")}
+Location: ${filters.location}
+Job Type: ${filters.type}
+Salary: ${filters.salary}
+Profile: ${parsed.summary}
+
+Search JobStreet PH, OnlineJobs.ph, Kalibrr, LinkedIn PH. Return real current listings with direct links.`
+          }]
+        })
+      });
+
+      const searchData = await searchRes.json();
+      const textBlock = searchData.content.find(b => b.type === "text");
+      let jobs = [];
+      if (textBlock) {
+        const clean = textBlock.text.replace(/```json|```/g, "").trim();
+        const jsonMatch = clean.match(/\[[\s\S]*\]/);
+        if (jsonMatch) jobs = JSON.parse(jsonMatch[0]);
+      }
+
+      // Fallback: generate smart search URLs if no jobs found
+      if (!jobs.length) {
+        const query = encodeURIComponent(`${parsed.degree} fresh graduate ${filters.location}`);
+        jobs = [
+          { title: `${parsed.degree} Graduate`, company: "Various Companies", location: filters.location, salary: "Competitive", platform: "JobStreet", url: `https://www.jobstreet.com.ph/en/job-search/${encodeURIComponent(parsed.degree.toLowerCase().replace(/ /g,"-"))}-jobs/`, matchScore: 90, matchReason: `Directly matched to your ${parsed.degree} degree on JobStreet PH. Fresh graduate roles available.`, tags: parsed.skills?.slice(0,3) || ["Entry Level","Fresh Grad","Full-time"], type: filters.type },
+          { title: `Entry Level ${parsed.degree}`, company: "Various Companies", location: filters.location, salary: "Competitive", platform: "Kalibrr", url: `https://www.kalibrr.com/job-board/te/${encodeURIComponent(parsed.degree.toLowerCase())}`, matchScore: 87, matchReason: `Kalibrr specializes in fresh graduate hiring. Your skills match several active openings.`, tags: ["Entry Level","Fresh Grad","Mentorship"], type: filters.type },
+          { title: `Junior ${parsed.degree} Role`, company: "Various Companies", location: filters.location, salary: "Competitive", platform: "LinkedIn", url: `https://www.linkedin.com/jobs/search/?keywords=${encodeURIComponent(parsed.degree)}&location=Philippines&f_E=1`, matchScore: 85, matchReason: `LinkedIn PH has active fresh graduate openings matching your degree and location preference.`, tags: ["LinkedIn","Entry Level","Network"], type: filters.type },
+          { title: `${parsed.degree} Associate`, company: "Various Companies", location: filters.location, salary: "Competitive", platform: "OnlineJobs.ph", url: `https://www.onlinejobs.ph/jobseekers/info/${encodeURIComponent(parsed.degree)}`, matchScore: 82, matchReason: `OnlineJobs.ph connects Filipino fresh grads with local and remote opportunities.`, tags: ["Remote Possible","Entry Level","PH-based"], type: filters.type },
+        ];
+      }
+
+      clearInterval(msgTimer);
+      setResults({ profile: parsed, jobs });
+      setStage("results");
+    } catch (err) {
+      clearInterval(msgTimer);
+      setLoadMsg("Something went wrong. Please try again.");
+      setTimeout(() => setStage("upload"), 2500);
+    }
+  };
+
+  const platformColors = { JobStreet: "#e53e3e", "OnlineJobs.ph": "#38a169", LinkedIn: "#0077b5", Kalibrr: "#805ad5", JobBank: "#dd6b20" };
+  const platformBg = { JobStreet: "rgba(229,62,62,0.12)", "OnlineJobs.ph": "rgba(56,161,105,0.12)", LinkedIn: "rgba(0,119,181,0.12)", Kalibrr: "rgba(128,90,213,0.12)", JobBank: "rgba(221,107,32,0.12)" };
 
   return (
-    <div style={{ minHeight: "100vh", background: C.cream, paddingTop: 80 }}>
-      <div style={{ maxWidth: 1000, margin: "0 auto", padding: "50px 2rem" }}>
-        <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: "clamp(2rem,4vw,2.8rem)", color: C.ink, marginBottom: 8 }}>Applicants</h1>
-        <p style={{ color: C.muted, fontSize: 15, marginBottom: 36 }}>Review everyone who applied to your job listings.</p>
-        <Card style={{ padding: 0, overflow: "hidden" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr style={{ background: C.parchment }}>
-                {["Applicant","Degree","School","Role Applied","Applied","Status","Action"].map(h => <th key={h} style={{ padding: "14px 20px", textAlign: "left", fontSize: 11, fontWeight: 700, color: C.muted, letterSpacing: 0.8, textTransform: "uppercase" }}>{h}</th>)}
-              </tr>
-            </thead>
-            <tbody>
-              {mockApplicants.map((a, i) => (
-                <tr key={i} style={{ borderTop: `1px solid ${C.parchment}` }}>
-                  <td style={{ padding: "16px 20px" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <div style={{ width: 34, height: 34, borderRadius: "50%", background: C.sagePale, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 13, color: C.forest }}>{a.name[0]}</div>
-                      <span style={{ fontWeight: 700, fontSize: 14, color: C.ink }}>{a.name}</span>
-                    </div>
-                  </td>
-                  <td style={{ padding: "16px 20px", fontSize: 13, color: C.inkLight }}>{a.degree}</td>
-                  <td style={{ padding: "16px 20px", fontSize: 13, color: C.muted }}>{a.school}</td>
-                  <td style={{ padding: "16px 20px", fontSize: 13, color: C.inkLight }}>{a.job}</td>
-                  <td style={{ padding: "16px 20px", fontSize: 12, color: C.muted }}>{a.applied}</td>
-                  <td style={{ padding: "16px 20px" }}><Badge color={statusColor[a.status][0]} bg={statusColor[a.status][1]}>{a.status}</Badge></td>
-                  <td style={{ padding: "16px 20px" }}><Btn variant="sage" style={{ fontSize: 11, padding: "6px 14px" }}>View Resume</Btn></td>
-                </tr>
+    <div style={{ minHeight: "100vh", background: T.bg, paddingTop: 60 }}>
+
+      {/* ── HERO ── */}
+      {stage === "upload" && (
+        <section style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "80px 2rem", position: "relative", overflow: "hidden" }}>
+          {/* bg grid */}
+          <div style={{ position: "absolute", inset: 0, backgroundImage: `linear-gradient(${T.border}40 1px, transparent 1px), linear-gradient(90deg, ${T.border}40 1px, transparent 1px)`, backgroundSize: "48px 48px", pointerEvents: "none" }} />
+          {/* glow orbs */}
+          <div style={{ position: "absolute", width: 500, height: 500, borderRadius: "50%", background: `radial-gradient(circle, ${T.accentGlow} 0%, transparent 70%)`, top: "10%", left: "50%", transform: "translateX(-50%)", pointerEvents: "none" }} />
+
+          <div style={{ position: "relative", maxWidth: 760, textAlign: "center", animation: "fadeUp 0.7s ease" }}>
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 8, background: T.accentGlow, border: `1px solid ${T.accent}33`, borderRadius: 40, padding: "6px 18px", marginBottom: 32 }}>
+              <span style={{ width: 6, height: 6, borderRadius: "50%", background: T.green, display: "inline-block", animation: "pulse 2s infinite" }} />
+              <span style={{ color: T.accent, fontSize: 11, fontWeight: 700, letterSpacing: 1.5 }}>AI-POWERED · PHILIPPINE JOB BOARDS · REAL LISTINGS</span>
+            </div>
+
+            <h1 style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontSize: "clamp(3rem,7vw,5.5rem)", fontWeight: 400, color: T.text, lineHeight: 1.05, marginBottom: 20, letterSpacing: "-1px" }}>
+              Upload your resume.<br />
+              <em style={{ color: T.accent }}>We find your job.</em>
+            </h1>
+
+            <p style={{ color: T.textMid, fontSize: "clamp(1rem,2vw,1.15rem)", lineHeight: 1.8, marginBottom: 56, maxWidth: 540, margin: "0 auto 56px" }}>
+              Our AI reads your resume, understands your degree and skills, then scans JobStreet PH, OnlineJobs.ph, Kalibrr, and LinkedIn to find real, open roles matched to you — with direct links.
+            </p>
+
+            {/* Upload Zone */}
+            <div
+              onClick={() => fileRef.current.click()}
+              onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={e => { e.preventDefault(); setDragOver(false); handleFile(e.dataTransfer.files[0]); }}
+              style={{ border: `2px dashed ${dragOver ? T.accent : file ? T.green : T.border}`, borderRadius: 20, padding: "52px 40px", cursor: "pointer", background: dragOver ? T.accentGlow : file ? T.greenPale : T.surface, transition: "all 0.25s", marginBottom: 24, position: "relative", overflow: "hidden" }}
+            >
+              {/* scanline effect */}
+              {!file && <div style={{ position: "absolute", inset: 0, background: `linear-gradient(transparent 0%, ${T.accent}08 50%, transparent 100%)`, height: "30%", animation: "scanline 3s ease-in-out infinite", pointerEvents: "none" }} />}
+
+              <div style={{ fontSize: 48, marginBottom: 16 }}>{file ? "📄" : "⬆️"}</div>
+              {file ? (
+                <>
+                  <p style={{ color: T.green, fontWeight: 700, fontSize: 16, marginBottom: 6 }}>{file.name}</p>
+                  <p style={{ color: T.textMid, fontSize: 13 }}>Ready to analyze · Click to change file</p>
+                </>
+              ) : (
+                <>
+                  <p style={{ color: T.text, fontWeight: 700, fontSize: 16, marginBottom: 6 }}>Drop your resume here</p>
+                  <p style={{ color: T.textMid, fontSize: 13 }}>PDF format · Max 10MB · Your data stays private</p>
+                </>
+              )}
+              <input ref={fileRef} type="file" accept=".pdf" style={{ display: "none" }} onChange={e => handleFile(e.target.files[0])} />
+            </div>
+
+            {file && (
+              <Btn onClick={() => setStage("filters")} style={{ padding: "14px 40px", fontSize: 15, background: T.accent, color: T.bg, borderRadius: 12, animation: "glow 2s infinite" }}>
+                Continue → Set Preferences
+              </Btn>
+            )}
+
+            <div style={{ display: "flex", gap: 32, justifyContent: "center", marginTop: 56, flexWrap: "wrap" }}>
+              {[["🔒","Private","Your resume is never stored"],["⚡","60 Seconds","From upload to matched jobs"],["🇵🇭","PH-Focused","Real Philippine job boards"],["🎓","Fresh Grad","Built for new graduates"]].map(([ic,t,d]) => (
+                <div key={t} style={{ textAlign: "center" }}>
+                  <div style={{ fontSize: 24, marginBottom: 6 }}>{ic}</div>
+                  <div style={{ color: T.text, fontWeight: 700, fontSize: 13 }}>{t}</div>
+                  <div style={{ color: T.textLow, fontSize: 11 }}>{d}</div>
+                </div>
               ))}
-            </tbody>
-          </table>
-        </Card>
-      </div>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ── FILTERS ── */}
+      {stage === "filters" && (
+        <section style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: "100px 2rem", animation: "fadeUp 0.4s ease" }}>
+          <div style={{ width: "100%", maxWidth: 520 }}>
+            <div style={{ marginBottom: 40, textAlign: "center" }}>
+              <div style={{ width: 48, height: 48, borderRadius: 14, background: T.accentGlow, border: `1px solid ${T.accent}33`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, margin: "0 auto 16px" }}>⚙️</div>
+              <h2 style={{ fontFamily: "'Instrument Serif', serif", fontSize: 32, color: T.text, marginBottom: 8 }}>Set your preferences</h2>
+              <p style={{ color: T.textMid, fontSize: 14 }}>Help us narrow down the best matches for you.</p>
+            </div>
+
+            <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 20, padding: 36, display: "flex", flexDirection: "column", gap: 24 }}>
+              {/* Location */}
+              <div>
+                <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: T.textMid, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 10 }}>Preferred Location</label>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  {["Metro Manila","Cebu","Davao","Laguna","Remote / WFH","Open to Anywhere"].map(loc => (
+                    <button key={loc} onClick={() => setFilters(f => ({ ...f, location: loc }))} style={{ padding: "8px 16px", borderRadius: 8, border: `1.5px solid ${filters.location === loc ? T.accent : T.border}`, background: filters.location === loc ? T.accentGlow : "transparent", color: filters.location === loc ? T.accent : T.textMid, fontSize: 12, fontWeight: 600, cursor: "pointer", transition: "all 0.18s", fontFamily: "'Syne', sans-serif" }}>{loc}</button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Job Type */}
+              <div>
+                <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: T.textMid, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 10 }}>Employment Type</label>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  {["Full-time","Part-time","Internship","Freelance","Remote"].map(t => (
+                    <button key={t} onClick={() => setFilters(f => ({ ...f, type: t }))} style={{ padding: "8px 16px", borderRadius: 8, border: `1.5px solid ${filters.type === t ? T.accent : T.border}`, background: filters.type === t ? T.accentGlow : "transparent", color: filters.type === t ? T.accent : T.textMid, fontSize: 12, fontWeight: 600, cursor: "pointer", transition: "all 0.18s", fontFamily: "'Syne', sans-serif" }}>{t}</button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Salary */}
+              <div>
+                <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: T.textMid, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 10 }}>Expected Monthly Salary</label>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  {["Any","₱15K–₱20K","₱20K–₱30K","₱30K–₱50K","₱50K+"].map(s => (
+                    <button key={s} onClick={() => setFilters(f => ({ ...f, salary: s }))} style={{ padding: "8px 16px", borderRadius: 8, border: `1.5px solid ${filters.salary === s ? T.gold : T.border}`, background: filters.salary === s ? T.goldPale : "transparent", color: filters.salary === s ? T.gold : T.textMid, fontSize: 12, fontWeight: 600, cursor: "pointer", transition: "all 0.18s", fontFamily: "'Syne', sans-serif" }}>{s}</button>
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ display: "flex", gap: 12, marginTop: 8 }}>
+                <Btn variant="ghost" onClick={() => setStage("upload")} style={{ flex: 1, padding: 13 }}>← Back</Btn>
+                <Btn onClick={runSearch} style={{ flex: 2, padding: 13, fontSize: 14, background: T.accent, color: T.bg, borderRadius: 10 }}>
+                  Find My Jobs ✦
+                </Btn>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ── LOADING ── */}
+      {stage === "loading" && (
+        <section style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "80px 2rem", animation: "fadeIn 0.4s ease" }}>
+          <div style={{ textAlign: "center", maxWidth: 480 }}>
+            <div style={{ width: 80, height: 80, borderRadius: "50%", border: `3px solid ${T.border}`, borderTopColor: T.accent, animation: "spin 1s linear infinite", margin: "0 auto 32px" }} />
+            <h2 style={{ fontFamily: "'Instrument Serif', serif", fontSize: 28, color: T.text, marginBottom: 12, animation: "fadeIn 0.3s ease" }}>{loadMsg}</h2>
+            <p style={{ color: T.textMid, fontSize: 14 }}>Scanning JobStreet, OnlineJobs.ph, LinkedIn PH & more…</p>
+            <div style={{ display: "flex", gap: 12, justifyContent: "center", marginTop: 40, flexWrap: "wrap" }}>
+              {["JobStreet PH","OnlineJobs.ph","LinkedIn","Kalibrr"].map(p => (
+                <div key={p} style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 8, padding: "6px 14px", fontSize: 11, color: T.textMid, fontWeight: 600, animation: "shimmer 2s infinite" }}>{p}</div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ── RESULTS ── */}
+      {stage === "results" && results && (
+        <section style={{ minHeight: "100vh", padding: "90px 2rem 60px", animation: "fadeUp 0.5s ease" }}>
+          <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+            {/* Candidate profile strip */}
+            <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 16, padding: "20px 28px", marginBottom: 32, display: "flex", alignItems: "center", gap: 20, flexWrap: "wrap" }}>
+              <div style={{ width: 48, height: 48, borderRadius: "50%", background: T.accentGlow, border: `2px solid ${T.accent}44`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>🎓</div>
+              <div style={{ flex: 1 }}>
+                <p style={{ fontWeight: 800, fontSize: 16, color: T.text, marginBottom: 2 }}>{results.profile?.name || "Your Profile"}</p>
+                <p style={{ color: T.textMid, fontSize: 13 }}>{results.profile?.degree} · {results.profile?.school} · {filters.location} · {filters.type}</p>
+              </div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                {results.profile?.skills?.slice(0,4).map(s => <Tag key={s}>{s}</Tag>)}
+              </div>
+              <Btn variant="ghost" onClick={() => { setStage("upload"); setFile(null); setBase64(null); setResults(null); }} style={{ fontSize: 12, padding: "8px 16px", flexShrink: 0 }}>↺ New Search</Btn>
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 28, flexWrap: "wrap", gap: 12 }}>
+              <div>
+                <h2 style={{ fontFamily: "'Instrument Serif', serif", fontSize: 28, color: T.text, marginBottom: 4 }}>Your Matched Jobs</h2>
+                <p style={{ color: T.textMid, fontSize: 14 }}>{results.jobs?.length} roles found across Philippine job boards · Click any card to view details & apply</p>
+              </div>
+              <Btn variant="ghost" onClick={() => setStage("filters")} style={{ fontSize: 12 }}>⚙ Adjust Filters</Btn>
+            </div>
+
+            {/* Job cards grid */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px,1fr))", gap: 18 }}>
+              {results.jobs?.map((job, i) => {
+                const pColor = platformColors[job.platform] || T.accent;
+                const pBg = platformBg[job.platform] || T.accentGlow;
+                const isOpen = openCard === i;
+                return (
+                  <div key={i} style={{ background: T.surface, border: `1.5px solid ${isOpen ? T.accent : T.border}`, borderRadius: 16, overflow: "hidden", transition: "all 0.25s", cursor: "pointer", animation: `fadeUp 0.4s ease ${i * 0.07}s both` }}
+                    onClick={() => setOpenCard(isOpen ? null : i)}>
+                    {/* Match score bar */}
+                    <div style={{ height: 3, background: T.border, position: "relative" }}>
+                      <div style={{ position: "absolute", left: 0, top: 0, height: "100%", width: `${job.matchScore || 80}%`, background: `linear-gradient(90deg, ${T.accent}, ${T.gold})`, borderRadius: 2 }} />
+                    </div>
+
+                    <div style={{ padding: 22 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6 }}>
+                            <span style={{ background: pBg, color: pColor, border: `1px solid ${pColor}33`, borderRadius: 6, padding: "2px 8px", fontSize: 10, fontWeight: 700, letterSpacing: 0.5 }}>{job.platform}</span>
+                            <span style={{ color: T.textLow, fontSize: 10 }}>#{i + 1} match</span>
+                          </div>
+                          <h3 style={{ fontFamily: "'Instrument Serif', serif", fontSize: 18, color: T.text, lineHeight: 1.3, marginBottom: 4 }}>{job.title}</h3>
+                          <p style={{ color: T.textMid, fontSize: 12 }}>{job.company} · {job.location}</p>
+                        </div>
+                        <div style={{ textAlign: "right", flexShrink: 0, marginLeft: 12 }}>
+                          <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 20, fontWeight: 500, color: T.gold }}>{job.matchScore || 80}%</div>
+                          <div style={{ color: T.textLow, fontSize: 10 }}>match</div>
+                        </div>
+                      </div>
+
+                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 14 }}>
+                        {job.tags?.slice(0,3).map(t => <Tag key={t} color={T.textMid} bg={T.surfaceHigh}>{t}</Tag>)}
+                        <Tag color={T.green} bg={T.greenPale}>{job.type || filters.type}</Tag>
+                      </div>
+
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <span style={{ color: T.accent, fontWeight: 700, fontSize: 13 }}>{job.salary}</span>
+                        <span style={{ color: T.textLow, fontSize: 11 }}>{isOpen ? "▲ collapse" : "▼ see why"}</span>
+                      </div>
+
+                      {/* Expanded: match reason + apply button */}
+                      {isOpen && (
+                        <div style={{ marginTop: 16, animation: "fadeUp 0.2s ease" }}>
+                          <div style={{ background: T.surfaceHigh, border: `1px solid ${T.border}`, borderRadius: 10, padding: "12px 14px", marginBottom: 14 }}>
+                            <p style={{ fontSize: 11, color: T.accent, fontWeight: 700, marginBottom: 6, letterSpacing: 0.5 }}>✦ WHY THIS MATCHES YOU</p>
+                            <p style={{ color: T.textMid, fontSize: 13, lineHeight: 1.65 }}>{job.matchReason}</p>
+                          </div>
+                          <a href={job.url} target="_blank" rel="noopener noreferrer" style={{ display: "block", textDecoration: "none" }} onClick={e => e.stopPropagation()}>
+                            <div style={{ background: T.accent, color: T.bg, borderRadius: 10, padding: "12px", textAlign: "center", fontWeight: 800, fontSize: 14, transition: "opacity 0.18s" }}
+                              onMouseEnter={e => e.target.style.opacity = "0.85"} onMouseLeave={e => e.target.style.opacity = "1"}>
+                              Apply on {job.platform} →
+                            </div>
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Quick links to job boards */}
+            <div style={{ marginTop: 48, background: T.surface, border: `1px solid ${T.border}`, borderRadius: 16, padding: 28 }}>
+              <p style={{ color: T.textMid, fontSize: 12, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", marginBottom: 20 }}>Browse More on Philippine Job Boards</p>
+              <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+                {[
+                  { name: "JobStreet PH", url: `https://www.jobstreet.com.ph/en/job-search/${encodeURIComponent((results.profile?.degree||"").toLowerCase().replace(/ /g,"-"))}-jobs/`, color: "#e53e3e" },
+                  { name: "OnlineJobs.ph", url: `https://www.onlinejobs.ph/jobseekers/info/${encodeURIComponent(results.profile?.degree||"")}`, color: "#38a169" },
+                  { name: "Kalibrr PH", url: `https://www.kalibrr.com/job-board`, color: "#805ad5" },
+                  { name: "LinkedIn PH", url: `https://www.linkedin.com/jobs/search/?keywords=${encodeURIComponent(results.profile?.degree||"")}&location=Philippines&f_E=1`, color: "#0077b5" },
+                  { name: "JobBank PH", url: `https://www.jobbank.ph/search?q=${encodeURIComponent(results.profile?.degree||"")}`, color: "#dd6b20" },
+                  { name: "MyJobStreet", url: `https://my.jobstreet.com/en/job-search/`, color: "#c53030" },
+                ].map(b => (
+                  <a key={b.name} href={b.url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
+                    <div style={{ background: T.surfaceHigh, border: `1.5px solid ${b.color}44`, borderRadius: 10, padding: "10px 18px", color: b.color, fontSize: 13, fontWeight: 700, transition: "all 0.18s", cursor: "pointer" }}
+                      onMouseEnter={e => { e.currentTarget.style.background = b.color + "18"; e.currentTarget.style.borderColor = b.color; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = T.surfaceHigh; e.currentTarget.style.borderColor = b.color + "44"; }}>
+                      {b.name} ↗
+                    </div>
+                  </a>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
     </div>
   );
 }
@@ -762,89 +506,94 @@ function CareerPaths() {
   const [active, setActive] = useState(0);
   const p = CAREER_PATHS[active];
   return (
-    <div style={{ minHeight: "100vh", background: C.cream, paddingTop: 80 }}>
-      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "50px 2rem" }}>
-        <div style={{ textAlign: "center", marginBottom: 48 }}>
-          <span style={{ color: C.moss, fontSize: 11, letterSpacing: 2, fontWeight: 700, textTransform: "uppercase" }}>Navigate Your Future</span>
-          <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: "clamp(2rem,4vw,3rem)", color: C.ink, marginBottom: 10, marginTop: 8 }}>Career Paths by Degree</h1>
-          <p style={{ color: C.muted, fontSize: 15, maxWidth: 520, margin: "0 auto" }}>Select your degree to see where you can go — salaries, certifications, and exactly where to start.</p>
+    <div style={{ minHeight: "100vh", background: T.bg, paddingTop: 60 }}>
+      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "60px 2rem" }}>
+        <div style={{ textAlign: "center", marginBottom: 52 }}>
+          <p style={{ color: T.accent, fontSize: 11, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", marginBottom: 12 }}>Navigate Your Future</p>
+          <h1 style={{ fontFamily: "'Instrument Serif', serif", fontSize: "clamp(2.2rem,5vw,3.5rem)", color: T.text, marginBottom: 12, fontStyle: "italic" }}>Career Paths by Degree</h1>
+          <p style={{ color: T.textMid, fontSize: 15, maxWidth: 500, margin: "0 auto" }}>Select your degree to see a real roadmap — salaries, certifications, and where to start.</p>
         </div>
 
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "center", marginBottom: 48 }}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center", marginBottom: 48 }}>
           {CAREER_PATHS.map((cp, i) => (
-            <button key={cp.degree} onClick={() => setActive(i)} style={{ padding: "10px 20px", borderRadius: 28, border: `2px solid ${active === i ? cp.color : C.stone}`, background: active === i ? cp.color + "18" : "transparent", color: active === i ? cp.color : C.muted, fontSize: 13, cursor: "pointer", fontWeight: active === i ? 700 : 500, transition: "all 0.2s" }}>
+            <button key={cp.degree} onClick={() => setActive(i)} style={{ padding: "9px 18px", borderRadius: 10, border: `1.5px solid ${active === i ? T.accent : T.border}`, background: active === i ? T.accentGlow : T.surface, color: active === i ? T.accent : T.textMid, fontSize: 12, fontWeight: 700, cursor: "pointer", transition: "all 0.2s", fontFamily: "'Syne', sans-serif" }}>
               {cp.icon} {cp.degree}
             </button>
           ))}
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
-          <Card style={{ gridColumn: "1/-1" }}>
-            <h3 style={{ fontFamily: "'Fraunces', serif", fontSize: 18, color: C.ink, marginBottom: 20 }}>📈 Career Progression</h3>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18 }}>
+          <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 16, padding: 28, gridColumn: "1/-1" }}>
+            <p style={{ color: T.textMid, fontSize: 11, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 20 }}>Career Progression</p>
             <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
               {p.roles.map((r, i) => (
                 <div key={r} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <div style={{ background: i === 0 ? p.color + "22" : C.parchment, border: `1.5px solid ${i === 0 ? p.color : C.stone}`, borderRadius: 10, padding: "8px 16px", color: i === 0 ? p.color : C.muted, fontSize: 13, fontWeight: i === 0 ? 700 : 400 }}>{r}</div>
-                  {i < p.roles.length - 1 && <span style={{ color: C.stone, fontSize: 18 }}>→</span>}
+                  <div style={{ background: i === 0 ? T.accentGlow : T.surfaceHigh, border: `1.5px solid ${i === 0 ? T.accent : T.border}`, borderRadius: 10, padding: "9px 18px", color: i === 0 ? T.accent : T.textMid, fontSize: 13, fontWeight: i === 0 ? 700 : 400 }}>{r}</div>
+                  {i < p.roles.length - 1 && <span style={{ color: T.textLow, fontSize: 16 }}>→</span>}
                 </div>
               ))}
             </div>
-          </Card>
+          </div>
 
-          <Card>
-            <h3 style={{ fontFamily: "'Fraunces', serif", fontSize: 17, color: C.ink, marginBottom: 12 }}>💰 Salary Range</h3>
-            <p style={{ fontFamily: "'Fraunces', serif", fontSize: 26, fontWeight: 900, color: p.color, marginBottom: 8 }}>{p.salary}</p>
-            <p style={{ color: C.muted, fontSize: 12 }}>Philippine market, entry to senior level.</p>
-          </Card>
+          <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 16, padding: 28 }}>
+            <p style={{ color: T.textMid, fontSize: 11, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 12 }}>Salary Range</p>
+            <p style={{ fontFamily: "'Instrument Serif', serif", fontSize: 32, color: T.gold, marginBottom: 8 }}>{p.salary}</p>
+            <p style={{ color: T.textLow, fontSize: 12 }}>Philippine market, entry to senior level.</p>
+          </div>
 
-          <Card>
-            <h3 style={{ fontFamily: "'Fraunces', serif", fontSize: 17, color: C.ink, marginBottom: 14 }}>🏭 Industries</h3>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>{p.industries.map(ind => <Badge key={ind} color={C.forest} bg={C.sagePale}>{ind}</Badge>)}</div>
-          </Card>
+          <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 16, padding: 28 }}>
+            <p style={{ color: T.textMid, fontSize: 11, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 16 }}>Certifications to Pursue</p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {p.certs.map(c => <div key={c} style={{ display: "flex", gap: 10, alignItems: "center", color: T.textMid, fontSize: 13 }}><span style={{ color: T.green }}>✓</span>{c}</div>)}
+            </div>
+          </div>
 
-          <Card>
-            <h3 style={{ fontFamily: "'Fraunces', serif", fontSize: 17, color: C.ink, marginBottom: 14 }}>🎖 Certifications</h3>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>{p.certs.map(c => <div key={c} style={{ display: "flex", gap: 8, alignItems: "center", color: C.inkLight, fontSize: 13 }}><span style={{ color: p.color }}>✓</span>{c}</div>)}</div>
-          </Card>
+          <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 16, padding: 28 }}>
+            <p style={{ color: T.textMid, fontSize: 11, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 16 }}>Industries to Explore</p>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {p.industries.map(ind => <Tag key={ind} color={T.textMid} bg={T.surfaceHigh}>{ind}</Tag>)}
+            </div>
+          </div>
 
-          <Card style={{ gridColumn: "1/-1", background: p.color + "0f", border: `1.5px solid ${p.color}33` }}>
-            <h3 style={{ fontFamily: "'Fraunces', serif", fontSize: 17, color: p.color, marginBottom: 10 }}>🚀 Your First Step — Right Now</h3>
-            <p style={{ color: C.inkLight, fontSize: 15, lineHeight: 1.75 }}>{p.firstStep}</p>
-          </Card>
+          <div style={{ background: T.accentGlow, border: `1.5px solid ${T.accent}33`, borderRadius: 16, padding: 28, gridColumn: "1/-1" }}>
+            <p style={{ color: T.accent, fontSize: 11, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 10 }}>✦ Your First Step — Right Now</p>
+            <p style={{ color: T.text, fontSize: 15, lineHeight: 1.75 }}>{p.tip}</p>
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-// ─── Tutorial ─────────────────────────────────────────────────────────────────
-function Tutorial() {
+// ─── Guide ────────────────────────────────────────────────────────────────────
+function Guide() {
   const [open, setOpen] = useState(null);
   return (
-    <div style={{ minHeight: "100vh", background: C.cream, paddingTop: 80 }}>
-      <div style={{ maxWidth: 820, margin: "0 auto", padding: "50px 2rem" }}>
+    <div style={{ minHeight: "100vh", background: T.bg, paddingTop: 60 }}>
+      <div style={{ maxWidth: 780, margin: "0 auto", padding: "60px 2rem" }}>
         <div style={{ textAlign: "center", marginBottom: 56 }}>
-          <span style={{ color: C.moss, fontSize: 11, letterSpacing: 2, fontWeight: 700, textTransform: "uppercase" }}>Step-by-Step</span>
-          <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: "clamp(2rem,4vw,3rem)", color: C.ink, marginBottom: 10, marginTop: 8 }}>How to Land Your First Job</h1>
-          <p style={{ color: C.muted, fontSize: 15, maxWidth: 500, margin: "0 auto" }}>Never worked full-time? Follow this guide and go from fresh grad to hired — with confidence.</p>
+          <p style={{ color: T.accent, fontSize: 11, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", marginBottom: 12 }}>Step by Step</p>
+          <h1 style={{ fontFamily: "'Instrument Serif', serif", fontSize: "clamp(2.2rem,5vw,3.5rem)", color: T.text, marginBottom: 12, fontStyle: "italic" }}>How to Land Your First Job</h1>
+          <p style={{ color: T.textMid, fontSize: 15, maxWidth: 480, margin: "0 auto" }}>Never worked full-time? Follow this guide and go from fresh grad to hired — with confidence.</p>
         </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {TUTORIAL_STEPS.map((s, i) => {
             const isOpen = open === i;
             return (
-              <div key={i} style={{ background: "#fff", border: `1.5px solid ${isOpen ? C.moss : C.parchment}`, borderRadius: 14, overflow: "hidden", transition: "all 0.25s" }}>
-                <button onClick={() => setOpen(isOpen ? null : i)} style={{ width: "100%", background: "none", border: "none", padding: "22px 24px", cursor: "pointer", display: "flex", alignItems: "center", gap: 18, textAlign: "left" }}>
-                  <span style={{ fontFamily: "'Fraunces', serif", fontSize: 28, fontWeight: 900, color: isOpen ? C.moss : C.stone, minWidth: 42, transition: "color 0.2s" }}>{s.step}</span>
-                  <span style={{ fontSize: 24 }}>{s.icon}</span>
-                  <h3 style={{ color: C.ink, fontFamily: "'Fraunces', serif", fontSize: 17, flex: 1 }}>{s.title}</h3>
-                  <span style={{ color: C.muted, fontSize: 18, transition: "transform 0.25s", transform: isOpen ? "rotate(180deg)" : "none", display: "inline-block" }}>↓</span>
+              <div key={i} style={{ background: T.surface, border: `1.5px solid ${isOpen ? T.accent : T.border}`, borderRadius: 14, overflow: "hidden", transition: "all 0.25s" }}>
+                <button onClick={() => setOpen(isOpen ? null : i)} style={{ width: "100%", background: "none", border: "none", padding: "22px 24px", cursor: "pointer", display: "flex", alignItems: "center", gap: 20, textAlign: "left" }}>
+                  <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 22, fontWeight: 500, color: isOpen ? T.accent : T.textLow, minWidth: 38, transition: "color 0.2s" }}>{s.n}</span>
+                  <span style={{ fontSize: 22 }}>{s.icon}</span>
+                  <h3 style={{ color: T.text, fontFamily: "'Instrument Serif', serif", fontSize: 18, flex: 1 }}>{s.title}</h3>
+                  <span style={{ color: T.textLow, fontSize: 16, transition: "transform 0.25s", transform: isOpen ? "rotate(180deg)" : "none", display: "inline-block" }}>↓</span>
                 </button>
                 {isOpen && (
-                  <div style={{ padding: "0 24px 24px 24px", animation: "fadeUp 0.2s ease" }}>
-                    <p style={{ color: C.inkLight, fontSize: 14, lineHeight: 1.75, marginBottom: 14 }}>{s.content}</p>
-                    <div style={{ background: C.sagePale, border: `1px solid ${C.sage}`, borderRadius: 10, padding: "12px 16px", display: "flex", gap: 10 }}>
-                      <span style={{ color: C.moss }}>💡</span>
-                      <p style={{ color: C.forest, fontSize: 13 }}><strong>Pro Tip:</strong> {s.tip}</p>
+                  <div style={{ padding: "0 24px 24px", animation: "fadeUp 0.2s ease" }}>
+                    <p style={{ color: T.textMid, fontSize: 14, lineHeight: 1.75, marginBottom: 14 }}>{s.body}</p>
+                    <div style={{ background: T.accentGlow, border: `1px solid ${T.accent}33`, borderRadius: 10, padding: "12px 16px", display: "flex", gap: 10 }}>
+                      <span style={{ color: T.accent }}>💡</span>
+                      <p style={{ color: T.accent, fontSize: 13 }}><strong>Pro Tip:</strong> {s.tip}</p>
                     </div>
                   </div>
                 )}
@@ -860,18 +609,18 @@ function Tutorial() {
 // ─── Footer ───────────────────────────────────────────────────────────────────
 function Footer({ setPage }) {
   return (
-    <footer style={{ background: C.ink, padding: "48px 2rem" }}>
-      <div style={{ maxWidth: 1100, margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 24 }}>
+    <footer style={{ background: T.surface, borderTop: `1px solid ${T.border}`, padding: "40px 2rem" }}>
+      <div style={{ maxWidth: 1100, margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 20 }}>
         <div>
-          <div style={{ fontFamily: "'Fraunces', serif", color: "#fff", fontSize: 20, marginBottom: 4 }}>GradLaunch</div>
-          <p style={{ color: "rgba(255,255,255,0.35)", fontSize: 13 }}>Your career starts here. Built for Filipino fresh graduates.</p>
+          <div style={{ fontFamily: "'Instrument Serif', serif", color: T.text, fontSize: 18, marginBottom: 4 }}>GradLaunch</div>
+          <p style={{ color: T.textLow, fontSize: 12 }}>AI-powered job matching for Filipino fresh graduates. Always free.</p>
         </div>
         <div style={{ display: "flex", gap: 20 }}>
-          {[["landing","Home"],["hunter-jobs","Browse Jobs"],["paths","Career Paths"],["tutorial","Guide"]].map(([p,l]) => (
-            <button key={p} onClick={() => setPage(p)} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.4)", fontSize: 13, cursor: "pointer" }}>{l}</button>
+          {[["home","Job Finder"],["paths","Career Paths"],["guide","Guide"]].map(([p,l]) => (
+            <button key={p} onClick={() => setPage(p)} style={{ background: "none", border: "none", color: T.textLow, fontSize: 12, cursor: "pointer", fontFamily: "'Syne', sans-serif" }}>{l}</button>
           ))}
         </div>
-        <p style={{ color: "rgba(255,255,255,0.2)", fontSize: 12 }}>© 2025 GradLaunch · Free for everyone.</p>
+        <p style={{ color: T.textLow, fontSize: 11 }}>© 2025 GradLaunch · Built for 🇵🇭 fresh grads</p>
       </div>
     </footer>
   );
@@ -879,43 +628,16 @@ function Footer({ setPage }) {
 
 // ─── App Root ─────────────────────────────────────────────────────────────────
 export default function App() {
-  const [page, setPage] = useState("landing");
-  const [user, setUser] = useState(null);
-  const [toast, setToast] = useState(null);
-
-  const showToast = (msg, type = "success") => {
-    setToast({ msg, type });
-    setTimeout(() => setToast(null), 2800);
-  };
-
+  const [page, setPage] = useState("home");
   const goTo = (p) => { setPage(p); window.scrollTo({ top: 0, behavior: "smooth" }); };
-
-  const setUserAndPage = (updater) => {
-    setUser(updater);
-  };
-
-  const pages = {
-    landing: <Landing setPage={goTo} />,
-    login: <AuthPage mode="login" setPage={goTo} setUser={setUser} showToast={showToast} />,
-    signup: <AuthPage mode="signup" setPage={goTo} setUser={setUser} showToast={showToast} />,
-    "signup-hunter": <AuthPage mode="signup-hunter" setPage={goTo} setUser={setUser} showToast={showToast} />,
-    "signup-poster": <AuthPage mode="signup-poster" setPage={goTo} setUser={setUser} showToast={showToast} />,
-    "hunter-jobs": <HunterJobs user={user} setUser={setUserAndPage} showToast={showToast} />,
-    "hunter-saved": <HunterSaved user={user} setUser={setUserAndPage} showToast={showToast} />,
-    "hunter-profile": <HunterProfile user={user} setUser={setUserAndPage} showToast={showToast} />,
-    "poster-dashboard": <PosterDashboard user={user} />,
-    "poster-jobs": <PosterListings user={user} setUser={setUserAndPage} showToast={showToast} />,
-    "poster-applicants": <PosterApplicants />,
-    paths: <CareerPaths />,
-    tutorial: <Tutorial />,
-  };
 
   return (
     <div>
-      <style>{GLOBAL_CSS}</style>
-      <NavBar page={page} setPage={goTo} user={user} setUser={setUser} />
-      {pages[page] || pages.landing}
-      {toast && <Toast msg={toast.msg} type={toast.type} />}
+      <style>{STYLES}</style>
+      <NavBar page={page} setPage={goTo} />
+      {page === "home" && <><Home /><Footer setPage={goTo} /></>}
+      {page === "paths" && <><CareerPaths /><Footer setPage={goTo} /></>}
+      {page === "guide" && <><Guide /><Footer setPage={goTo} /></>}
     </div>
   );
 }
