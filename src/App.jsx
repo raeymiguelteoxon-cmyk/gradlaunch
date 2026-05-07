@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { Analytics } from "@vercel/analytics/react";
 
 const STYLES = `
   @import url('https://fonts.googleapis.com/css2?family=Clash+Display:wght@400;500;600;700&family=Fraunces:ital,wght@0,400;0,700;0,900;1,400;1,700&family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
@@ -331,7 +332,7 @@ function Home() {
                 <span style={{ color:C.forestMid, fontSize:11, fontWeight:700, letterSpacing:1.5 }}>FREE · AI-POWERED · NO SIGN-UP NEEDED</span>
               </div>
 
-              <h1 style={{ fontFamily:"'Fraunces',serif", fontSize:"clamp(2.6rem,6.5vw,4.8rem)", color:C.ink, lineHeight:1.05, marginBottom:20, letterSpacing:"-2px", fontWeight:900 }}>
+              <h1 style={{ fontFamily:"'Fraunces',serif", fontSize:"clamp(2.2rem,5vw,3.8rem)", color:C.ink, lineHeight:1.15, marginBottom:20, letterSpacing:"-1.5px", fontWeight:900 }}>
                 Upload your resume.<br />
                 <em style={{ color:C.forestMid, fontStyle:"italic" }}>We find your job.</em>
               </h1>
@@ -630,7 +631,7 @@ function CareerPaths() {
       <div style={{ maxWidth:1100, margin:"0 auto", padding:"50px 1.5rem" }}>
         <div style={{ textAlign:"center", marginBottom:44 }}>
           <p style={{ color:C.inkLow, fontSize:11, fontWeight:700, letterSpacing:2, textTransform:"uppercase", marginBottom:8 }}>Navigate Your Future</p>
-          <h1 style={{ fontFamily:"'Fraunces',serif", fontSize:"clamp(2rem,4.5vw,3.2rem)", color:C.ink, fontWeight:900, marginBottom:10 }}>Career Paths by Degree</h1>
+          <h1 style={{ fontFamily:"'Fraunces',serif", fontSize:"clamp(1.8rem,3.5vw,2.6rem)", color:C.ink, fontWeight:900, marginBottom:10 }}>Career Paths by Degree</h1>
           <p style={{ color:C.inkMid, fontSize:15, maxWidth:480, margin:"0 auto" }}>Select your degree to see a real roadmap — salaries, certifications, and where to start.</p>
         </div>
         <div style={{ display:"flex", gap:8, flexWrap:"wrap", justifyContent:"center", marginBottom:40 }}>
@@ -684,7 +685,7 @@ function Guide() {
       <div style={{ maxWidth:740, margin:"0 auto", padding:"50px 1.5rem" }}>
         <div style={{ textAlign:"center", marginBottom:44 }}>
           <p style={{ color:C.inkLow, fontSize:11, fontWeight:700, letterSpacing:2, textTransform:"uppercase", marginBottom:8 }}>Step by Step</p>
-          <h1 style={{ fontFamily:"'Fraunces',serif", fontSize:"clamp(2rem,4.5vw,3.2rem)", color:C.ink, fontWeight:900, marginBottom:10 }}>How to Land Your First Job</h1>
+          <h1 style={{ fontFamily:"'Fraunces',serif", fontSize:"clamp(1.8rem,3.5vw,2.6rem)", color:C.ink, fontWeight:900, marginBottom:10 }}>How to Land Your First Job</h1>
           <p style={{ color:C.inkMid, fontSize:15, maxWidth:440, margin:"0 auto" }}>Never worked full-time? Follow this guide and go from fresh grad to hired — with confidence.</p>
         </div>
         <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
@@ -723,7 +724,7 @@ function About() {
       <div style={{ maxWidth:800, margin:"0 auto", padding:"50px 1.5rem" }}>
         <div style={{ textAlign:"center", marginBottom:48 }}>
           <p style={{ color:C.inkLow, fontSize:11, fontWeight:700, letterSpacing:2, textTransform:"uppercase", marginBottom:8 }}>Our Story</p>
-          <h1 style={{ fontFamily:"'Fraunces',serif", fontSize:"clamp(2rem,4.5vw,3.2rem)", color:C.ink, fontWeight:900, marginBottom:16 }}>Built for Filipino Fresh Graduates</h1>
+          <h1 style={{ fontFamily:"'Fraunces',serif", fontSize:"clamp(1.8rem,3.5vw,2.6rem)", color:C.ink, fontWeight:900, marginBottom:16 }}>Built for Filipino Fresh Graduates</h1>
           <p style={{ color:C.inkMid, fontSize:16, lineHeight:1.8, maxWidth:580, margin:"0 auto" }}>GradLaunch was built out of a simple frustration: fresh graduates in the Philippines have no easy way to find jobs aligned with what they studied — and nobody tells them what to do next.</p>
         </div>
 
@@ -775,7 +776,7 @@ function Contact() {
         {/* Left */}
         <div>
           <p style={{ color:C.inkLow, fontSize:11, fontWeight:700, letterSpacing:2, textTransform:"uppercase", marginBottom:8 }}>Get in Touch</p>
-          <h1 style={{ fontFamily:"'Fraunces',serif", fontSize:"clamp(2rem,4vw,2.8rem)", color:C.ink, fontWeight:900, marginBottom:16 }}>We'd love to hear from you.</h1>
+          <h1 style={{ fontFamily:"'Fraunces',serif", fontSize:"clamp(1.8rem,3.2vw,2.4rem)", color:C.ink, fontWeight:900, marginBottom:16 }}>We'd love to hear from you.</h1>
           <p style={{ color:C.inkMid, fontSize:15, lineHeight:1.8, marginBottom:32 }}>Whether it's a bug report, a suggestion, a success story, or just a question — we read every message.</p>
 
           <div style={{ display:"flex", flexDirection:"column", gap:16, marginBottom:36 }}>
@@ -935,6 +936,7 @@ export default function App() {
   return (
     <div>
       <style>{STYLES}</style>
+      <Analytics />
       <NavBar page={page} setPage={goTo} />
       <BottomNav page={page} setPage={goTo} />
       {page==="home"    && <><Home /><Footer setPage={goTo} /></>}
