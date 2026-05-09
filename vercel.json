@@ -1,0 +1,9 @@
+{
+  "redirects": [
+    {
+      "source": "/(.*)",
+      "destination": "https://gradlaunchph.vercel.app/$1",
+      "permanent": true
+    }
+  ]
+}
